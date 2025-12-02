@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>板塊強弱勢排行</title>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg width='512' height='512' viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='bgGradient' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%234a4a4a'/%3E%3Cstop offset='100%25' stop-color='%23222222'/%3E%3C/linearGradient%3E%3ClinearGradient id='bgGloss' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,255,255,0.15)'/%3E%3Cstop offset='48%25' stop-color='rgba(255,255,255,0.05)'/%3E%3Cstop offset='50%25' stop-color='rgba(255,255,255,0)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,255,255,0)'/%3E%3C/linearGradient%3E%3ClinearGradient id='greenBody' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23b4f0a0'/%3E%3Cstop offset='50%25' stop-color='%2355d445'/%3E%3Cstop offset='100%25' stop-color='%232d8f2d'/%3E%3C/linearGradient%3E%3ClinearGradient id='greenStroke' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ccffcc'/%3E%3Cstop offset='100%25' stop-color='%231a5c1a'/%3E%3C/linearGradient%3E%3ClinearGradient id='redBody' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ffb3a0'/%3E%3Cstop offset='50%25' stop-color='%23ff4d4d'/%3E%3Cstop offset='100%25' stop-color='%238f1a1a'/%3E%3C/linearGradient%3E%3ClinearGradient id='redStroke' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ffcccc'/%3E%3Cstop offset='100%25' stop-color='%235c0a0a'/%3E%3C/linearGradient%3E%3ClinearGradient id='arrowGloss' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,255,255,0.9)'/%3E%3Cstop offset='20%25' stop-color='rgba(255,255,255,0.4)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,255,255,0)'/%3E%3C/linearGradient%3E%3Cfilter id='dropShadow' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeGaussianBlur in='SourceAlpha' stdDeviation='4'/%3E%3CfeOffset dx='0' dy='4' result='offsetblur'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.5'/%3E%3C/feComponentTransfer%3E%3CfeMerge%3E%3CfeMergeNode in='offsetblur'/%3E%3CfeMergeNode in='SourceGraphic'/%3E%3C/feMerge%3E%3C/filter%3E%3CclipPath id='clipBox'%3E%3Crect x='0' y='0' width='512' height='512' rx='90' ry='90'/%3E%3C/clipPath%3E%3Cfilter id='blurMe'%3E%3CfeGaussianBlur in='SourceGraphic' stdDeviation='2'/%3E%3C/filter%3E%3C/defs%3E%3Crect x='0' y='0' width='512' height='512' rx='90' ry='90' fill='url(%23bgGradient)'/%3E%3Cpath d='M0 0 H512 V200 L0 350 Z' fill='url(%23bgGloss)' opacity='0.8' clip-path='url(%23clipBox)'/%3E%3Cpath d='M -50 -50 L 562 -50 L 562 250 L -50 450 Z' fill='url(%23bgGloss)' clip-path='url(%23clipBox)'/%3E%3Cg filter='url(%23dropShadow)' transform='translate(60, 106)'%3E%3Cpath d='M90 0 L180 100 H135 V300 H45 V100 H0 L90 0Z' fill='url(%23greenStroke)' opacity='0.7' transform='scale(1.04) translate(-3, -3)'/%3E%3Cpath d='M90 0 L180 100 H135 V300 H45 V100 H0 L90 0Z' fill='url(%23greenBody)' stroke='rgba(255,255,255,0.3)' stroke-width='2'/%3E%3Cpath d='M90 10 L165 95 H125 V290 H55 V95 H15 L90 10Z' fill='url(%23arrowGloss)' opacity='0.6'/%3E%3Cpath d='M90 0 L130 50 H50 L90 0Z' fill='rgba(255,255,255,0.4)' opacity='0.5' filter='url(%23blurMe)'/%3E%3C/g%3E%3Cg filter='url(%23dropShadow)' transform='translate(270, 106)'%3E%3Cpath d='M90 300 L0 200 H45 V0 H135 V200 H180 L90 300Z' fill='url(%23redStroke)' opacity='0.7' transform='scale(1.04) translate(-3, -1)'/%3E%3Cpath d='M90 300 L0 200 H45 V0 H135 V200 H180 L90 300Z' fill='url(%23redBody)' stroke='rgba(255,255,255,0.3)' stroke-width='2'/%3E%3Cpath d='M45 0 H135 V190 L165 200 L90 280 L15 200 L45 190 V0Z' fill='url(%23arrowGloss)' opacity='0.5'/%3E%3C/g%3E%3C/svg%3E">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            750: '#2d3748',
+                            850: '#1a202c',
+                            950: '#0d1117',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+
+        /* Body fixed to prevent pull-to-refresh on mobile and general scroll */
+        body {
+            overscroll-behavior: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Hide scrollbar for horizontal scrolling areas but keep functionality */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div id="root" class="h-full flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- Constants & Config ---
+
+        const MARKETS = {
+            US: {
+                id: 'US',
+                label: '美股',
+                limit: 2000,
+                url: 'https://m-gl.lbkrs.com/api/forward/newmarket/revision/rank/pc/list?key=all&market=US&indicators[]=last_done&indicators[]=chg&indicators[]=change&indicators[]=total_amount&indicators[]=total_balance&indicators[]=five_min_chg&indicators[]=turnover_rate&indicators[]=amplitude&indicators[]=volume_rate&indicators[]=depth_rate&indicators[]=pb_ttm&indicators[]=market_cap&indicators[]=five_day_chg&indicators[]=ten_day_chg&indicators[]=twenty_day_chg&indicators[]=this_year_chg&indicators[]=half_year_chg&indicators[]=industry&sort_indicator=total_balance&order=desc&offset=0&limit=2000'
+            },
+            HK: {
+                id: 'HK',
+                label: '港股',
+                limit: 300,
+                url: 'https://m-gl.lbkrs.com/api/forward/newmarket/revision/rank/pc/list?key=all&market=HK&indicators[]=last_done&indicators[]=chg&indicators[]=change&indicators[]=total_amount&indicators[]=total_balance&indicators[]=five_min_chg&indicators[]=turnover_rate&indicators[]=amplitude&indicators[]=volume_rate&indicators[]=depth_rate&indicators[]=pb_ttm&indicators[]=market_cap&indicators[]=five_day_chg&indicators[]=ten_day_chg&indicators[]=twenty_day_chg&indicators[]=this_year_chg&indicators[]=half_year_chg&indicators[]=industry&sort_indicator=total_balance&order=desc&offset=0&limit=300'
+            }
+        };
+
+        const TIME_RANGES = [
+            { label: '1D', key: '1', idx: 1 },
+            { label: '5D', key: '12', idx: 12 },
+            { label: '10D', key: '13', idx: 13 },
+            { label: '1M', key: '14', idx: 14 },
+            { label: '6M', key: '16', idx: 16 },
+            { label: 'YTD', key: '15', idx: 15 }
+        ];
+
+        const IND_IDX = {
+            PRICE: 0,
+            CHG_1D: 1,
+            CHANGE: 2, // Unused
+            AMOUNT: 3, // Unused
+            BALANCE: 4, // Turnover Value
+            CHG_5MIN: 5, // Unused
+            TURNOVER: 6, // Unused
+            AMP: 7, // Unused
+            VOL_RATE: 8, // Unused
+            DEPTH: 9, // Unused
+            PB: 10, // Unused
+            MCAP: 11,
+            CHG_5D: 12,
+            CHG_10D: 13,
+            CHG_1M: 14,
+            CHG_YTD: 15,
+            CHG_6M: 16,
+            INDUSTRY: 17
+        };
+
+        // --- Utilities ---
+
+        const formatPercent = (raw) => {
+            const num = parseFloat(raw);
+            if (isNaN(num)) return '-';
+            const val = num * 100;
+            const sign = val > 0 ? '+' : '';
+            return `${sign}${val.toFixed(2)}%`;
+        };
+
+        const formatNumber = (raw) => {
+            const num = parseFloat(raw);
+            if (isNaN(num)) return '-';
+            return num.toFixed(2);
+        }
+
+        const formatLargeNumber = (raw) => {
+            const num = parseFloat(raw);
+            if (isNaN(num)) return '-';
+            const abs = Math.abs(num);
+            if (abs >= 1.0e12) return (num / 1.0e12).toFixed(2) + 'T';
+            if (abs >= 1.0e9) return (num / 1.0e9).toFixed(2) + 'B';
+            if (abs >= 1.0e6) return (num / 1.0e6).toFixed(2) + 'M';
+            if (abs >= 1.0e3) return (num / 1.0e3).toFixed(2) + 'K';
+            return num.toFixed(2);
+        };
+
+        const getColorClass = (val) => {
+            if (!val && val !== 0) return 'text-gray-500';
+            if (val > 0) return 'text-green-500 dark:text-green-400';
+            if (val < 0) return 'text-red-500 dark:text-red-400';
+            return 'text-gray-500 dark:text-gray-400';
+        };
+
+        const getBgColorClass = (val) => {
+            if (val > 0) return 'bg-green-500';
+            if (val < 0) return 'bg-red-500';
+            return 'bg-gray-500';
+        };
+
+        // --- Icons ---
+        const SunIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" /></svg>
+        );
+        const MoonIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></svg>
+        );
+        const LoaderIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-blue-500"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+        );
+        const ChevronUpIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><path d="m18 15-6-6-6 6" /></svg>
+        );
+        const ChevronDownIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><path d="m6 9 6 6 6-6" /></svg>
+        );
+        const PlusIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+        );
+        const MinusIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /></svg>
+        );
+        const NavArrowUp = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>
+        );
+        const NavArrowDown = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+        );
+        const CloseIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+        );
+        const RefreshIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        );
+
+        const MarketBreadth = ({ up, down }) => {
+            const total = up + down;
+            const downPct = total > 0 ? (down / total) * 100 : 0;
+            const upPct = total > 0 ? (up / total) * 100 : 0;
+
+            if (total === 0) return null;
+
+            return (
+                <div className="flex items-center gap-1.5 flex-1 max-w-[200px] mx-2 sm:mx-4">
+                    <span className="text-xs font-bold text-red-500 dark:text-red-400 w-8 text-right">{down}</span>
+                    <div className="flex-1 h-2.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden relative flex">
+                        {/* Center Marker */}
+                        <div className="absolute left-1/2 top-0 bottom-0 w-0 border-l-[1.5px] border-dashed border-black/60 z-10 transform -translate-x-1/2"></div>
+                        
+                        {/* Down Bar (Left) */}
+                        <div style={{ width: `${downPct}%` }} className="bg-red-500 dark:bg-red-500 h-full transition-all duration-500" />
+                        
+                        {/* Up Bar (Right) */}
+                        <div style={{ width: `${upPct}%` }} className="bg-green-500 dark:bg-green-500 h-full transition-all duration-500" />
+                    </div>
+                    <span className="text-xs font-bold text-green-500 dark:text-green-400 w-8 text-left">{up}</span>
+                </div>
+            );
+        };
+
+        // --- Components ---
+
+        const SectorCard = React.forwardRef(({ name, count, change, maxVal, onClick, isSelected }, ref) => {
+            // Normalize width relative to max value of its own group (gainers or losers)
+            const widthPercent = maxVal > 0
+                ? Math.min(100, (Math.abs(change) / maxVal) * 100)
+                : 0;
+
+            return (
+                <div
+                    ref={ref}
+                    onClick={onClick}
+                    className={`
+                        relative flex flex-col justify-center p-1 rounded-lg cursor-pointer transition-all duration-200 overflow-hidden
+                        ${isSelected
+                            ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500 shadow-lg transform scale-[1.02]'
+                            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-sm border border-gray-200 dark:border-gray-700'}
+                    `}
+                >
+                    {/* Background Bar */}
+                    <div
+                        className={`absolute bottom-0 left-0 top-0 opacity-25 transition-all duration-500 ${getBgColorClass(change)}`}
+                        style={{ width: `${widthPercent}%` }}
+                    />
+
+                    <div className="flex items-center justify-between z-10 gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="flex-none text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-800/50 px-1.5 rounded">
+                                {count}
+                            </span>
+                            <span className="font-medium text-sm truncate" title={name}>{name}</span>
+                        </div>
+                        <span className={`text-sm font-bold text-right font-mono ${getColorClass(change)}`}>
+                            {formatPercent(change)}
+                        </span>
+                    </div>
+                </div>
+            );
+        });
+
+        const StockTable = ({ stocks, timeRangeIdx }) => {
+            const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+
+            // Reset sort when sector changes (stocks prop changes)
+            useEffect(() => {
+                setSortConfig({ key: null, direction: null });
+            }, [stocks]);
+
+            if (!stocks || stocks.length === 0) {
+                return (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                        <p>請選擇上方板塊以查看詳情</p>
+                    </div>
+                );
+            }
+
+            const handleSort = (key) => {
+                setSortConfig(current => {
+                    if (current.key === key) {
+                        if (current.direction === 'desc') return { key, direction: 'asc' };
+                        if (current.direction === 'asc') return { key: null, direction: null };
+                    }
+                    return { key, direction: 'desc' };
+                });
+            };
+
+            const getSortIcon = (key) => {
+                if (sortConfig.key !== key) return null;
+                return sortConfig.direction === 'asc' ? '▲' : '▼';
+            };
+
+            // Sort logic
+            const sortedStocks = useMemo(() => {
+                let sortableStocks = [...stocks];
+
+                if (sortConfig.key !== null) {
+                    sortableStocks.sort((a, b) => {
+                        let valA, valB;
+
+                        // Handle specific column keys
+                        if (sortConfig.key === 'symbol') {
+                            valA = a.symbol || a.code;
+                            valB = b.symbol || b.code;
+                            // String comparison
+                            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                            return 0;
+                        } else if (sortConfig.key === 'name') {
+                            valA = a.name;
+                            valB = b.name;
+                            // String comparison
+                            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                            return 0;
+                        } else {
+                            // Numeric columns (indicators)
+                            valA = parseFloat(a.indicators[sortConfig.key]) || 0;
+                            valB = parseFloat(b.indicators[sortConfig.key]) || 0;
+                            return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+                        }
+                    });
+                } else {
+                    // Default sort: Current time range change Descending
+                    sortableStocks.sort((a, b) => {
+                        const valA = parseFloat(a.indicators[timeRangeIdx]) || 0;
+                        const valB = parseFloat(b.indicators[timeRangeIdx]) || 0;
+                        return valB - valA;
+                    });
+                }
+                return sortableStocks;
+            }, [stocks, timeRangeIdx, sortConfig]);
+
+            return (
+                <div className="flex-1 overflow-auto relative overscroll-none">
+                    <table className="w-full text-sm text-left border-collapse">
+                        <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400 sticky top-0 z-20 shadow-sm cursor-pointer select-none">
+                            <tr>
+                                <th scope="col" onClick={() => handleSort('symbol')} className="px-3 py-3 sticky left-0 z-30 bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-20 min-w-[5rem] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                    代號 <span className="text-[10px] ml-0.5">{getSortIcon('symbol')}</span>
+                                </th>
+                                <th scope="col" onClick={() => handleSort('name')} className="px-3 py-3 sticky left-20 z-30 bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-28 min-w-[7rem] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                    名稱 <span className="text-[10px] ml-0.5">{getSortIcon('name')}</span>
+                                </th>
+                                <th scope="col" onClick={() => handleSort(IND_IDX.PRICE)} className="px-3 py-3 whitespace-nowrap border-b dark:border-gray-700 text-right hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                    現價 <span className="text-[10px] ml-0.5">{getSortIcon(IND_IDX.PRICE)}</span>
+                                </th>
+
+                                {TIME_RANGES.map(range => (
+                                    <th
+                                        key={range.key}
+                                        scope="col"
+                                        onClick={() => handleSort(range.idx)}
+                                        className={`px-3 py-3 whitespace-nowrap border-b dark:border-gray-700 text-right hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${range.idx === timeRangeIdx ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''}`}
+                                    >
+                                        {range.label} <span className="text-[10px] ml-0.5">{getSortIcon(range.idx)}</span>
+                                    </th>
+                                ))}
+
+                                <th scope="col" onClick={() => handleSort(IND_IDX.MCAP)} className="px-3 py-3 whitespace-nowrap border-b dark:border-gray-700 text-right text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                    市值 <span className="text-[10px] ml-0.5">{getSortIcon(IND_IDX.MCAP)}</span>
+                                </th>
+                                <th scope="col" onClick={() => handleSort(IND_IDX.BALANCE)} className="px-3 py-3 whitespace-nowrap border-b dark:border-gray-700 text-right text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                    成交額 <span className="text-[10px] ml-0.5">{getSortIcon(IND_IDX.BALANCE)}</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">                            {sortedStocks.map((stock, idx) => (
+                            <tr key={stock.code || idx} className="bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <td className="px-3 py-2 font-medium text-gray-900 dark:text-white whitespace-nowrap sticky left-0 z-10 bg-white dark:bg-gray-900 border-r dark:border-gray-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-20 min-w-[5rem]">
+                                    {stock.symbol || stock.code}
+                                </td>
+                                <td className="px-3 py-2 truncate sticky left-20 z-10 bg-white dark:bg-gray-900 border-r dark:border-gray-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-28 min-w-[7rem] max-w-[7rem]" title={stock.name}>
+                                    {stock.name}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap font-mono text-right">
+                                    {formatNumber(stock.indicators[IND_IDX.PRICE])}
+                                </td>
+
+                                {TIME_RANGES.map(range => {
+                                    const val = stock.indicators[range.idx];
+                                    return (
+                                        <td
+                                            key={range.key}
+                                            className={`px-3 py-2 whitespace-nowrap font-mono text-right ${getColorClass(val)} ${range.idx === timeRangeIdx ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                                        >
+                                            {formatPercent(val)}
+                                        </td>
+                                    );
+                                })}
+
+                                <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-right font-mono text-xs">
+                                    {formatLargeNumber(stock.indicators[IND_IDX.MCAP])}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-right font-mono text-xs">
+                                    {formatLargeNumber(stock.indicators[IND_IDX.BALANCE])}
+                                </td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        };
+
+        const App = () => {
+            // State
+            const [market, setMarket] = useState('US');
+            const [timeRange, setTimeRange] = useState(TIME_RANGES[0]); // Default 1D
+            const [sortOrder, setSortOrder] = useState('desc'); // 'desc' = Strongest first, 'asc' = Weakest first
+            const [darkMode, setDarkMode] = useState(true);
+            const [selectedSector, setSelectedSector] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+            const [rawData, setRawData] = useState([]);
+
+            const sectorRefs = useRef({});
+            const scrollContainerRef = useRef(null);
+
+            // Effects
+            useEffect(() => {
+                document.documentElement.classList.toggle('dark', darkMode);
+            }, [darkMode]);
+
+            useEffect(() => {
+                fetchData();
+                // Reset selection when market changes
+                setSelectedSector(null);
+            }, [market]);
+
+            // Scroll selected sector into view with offset for sticky header
+            useEffect(() => {
+                if (selectedSector && sectorRefs.current[selectedSector] && scrollContainerRef.current) {
+                    const cardElement = sectorRefs.current[selectedSector];
+                    const container = scrollContainerRef.current;
+                    const rowElement = cardElement.closest('tr');
+
+                    if (rowElement) {
+                        // Calculate position: Row's top position - Header height (approx 40px)
+                        // We subtract a bit more (e.g. 40px) to ensure the header doesn't cover it
+                        const headerHeight = 40;
+                        const targetTop = rowElement.offsetTop - headerHeight;
+
+                        container.scrollTo({
+                            top: targetTop,
+                            behavior: 'smooth'
+                        });
+                    }
+                }
+            }, [selectedSector]);
+
+            const fetchData = async () => {
+                setLoading(true);
+                setError(null);
+
+                const PROXIES = [
+                    'https://corsproxy.io/?',
+                    'https://api.codetabs.com/v1/proxy?quest='
+                ];
+
+                let lastError = null;
+
+                for (const proxy of PROXIES) {
+                    try {
+                        // Using CORS Proxy
+                        const targetUrl = MARKETS[market].url;
+                        const proxyUrl = proxy + encodeURIComponent(targetUrl);
+
+                        const res = await fetch(proxyUrl);
+                        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+                        const json = await res.json();
+
+                        // Handle nested data structure: response.data.list
+                        if (json.data && Array.isArray(json.data.list)) {
+                            setRawData(json.data.list);
+                            setLoading(false); // Success
+                            return; // Exit function on success
+                        } else {
+                            throw new Error('Invalid API response structure');
+                        }
+                    } catch (err) {
+                        console.warn(`Proxy ${proxy} failed:`, err);
+                        lastError = err;
+                        // Continue to next proxy
+                    }
+                }
+
+                // All proxies failed
+                console.error("All proxies failed:", lastError);
+                setError(lastError ? lastError.message : "Failed to fetch data");
+                setLoading(false);
+            };
+
+            // Process Data: Group and Calculate
+            const processedSectors = useMemo(() => {
+                if (!rawData.length) return [];
+
+                const groups = {};
+
+                // 1. Group by Industry
+                rawData.forEach(stock => {
+                    const industry = stock.indicators[IND_IDX.INDUSTRY];
+                    // Filter invalid industries
+                    if (!industry || industry === '-') return;
+
+                    if (!groups[industry]) {
+                        groups[industry] = {
+                            name: industry,
+                            stocks: [],
+                            weightedChgs: {},
+                            totalMcap: 0
+                        };
+                        // Initialize accumulators
+                        TIME_RANGES.forEach(r => groups[industry].weightedChgs[r.key] = 0);
+                    }
+
+                    const mcap = parseFloat(stock.indicators[IND_IDX.MCAP]);
+
+                    if (isNaN(mcap) || mcap <= 0) return;
+
+                    groups[industry].stocks.push(stock);
+                    groups[industry].totalMcap += mcap;
+
+                    // Accumulate for each range
+                    TIME_RANGES.forEach(r => {
+                        const val = parseFloat(stock.indicators[r.idx]);
+                        if (!isNaN(val)) {
+                            groups[industry].weightedChgs[r.key] += (val * mcap);
+                        }
+                    });
+                });
+
+                // 2. Calculate Weighted Average & Flatten
+                const sectorList = Object.values(groups).map(group => {
+                    const changes = {};
+                    TIME_RANGES.forEach(r => {
+                        changes[r.key] = group.totalMcap > 0
+                            ? group.weightedChgs[r.key] / group.totalMcap
+                            : 0;
+                    });
+
+                    const avgChange = changes[timeRange.key];
+
+                    return {
+                        name: group.name,
+                        stocks: group.stocks,
+                        changes: changes,
+                        avgChange: avgChange
+                    };
+                });
+
+                // 3. Sort by Avg Change Descending (Default)
+                return sectorList.sort((a, b) => b.avgChange - a.avgChange);
+            }, [rawData, timeRange]);
+
+            // Sort logic for display
+            const displaySectors = useMemo(() => {
+                return sortOrder === 'desc'
+                    ? processedSectors
+                    : [...processedSectors].reverse();
+            }, [processedSectors, sortOrder]);
+
+            // Global Max Absolute Value for consistent bar scaling
+            const globalMaxVal = useMemo(() => {
+                if (processedSectors.length === 0) return 0.0001;
+                return Math.max(...processedSectors.map(s => Math.abs(s.avgChange)));
+            }, [processedSectors]);
+
+            // Calculate Market Breadth (Up/Down counts)
+            const breadthStats = useMemo(() => {
+                let up = 0;
+                let down = 0;
+                rawData.forEach(stock => {
+                    const val = parseFloat(stock.indicators[timeRange.idx]);
+                    if (!isNaN(val)) {
+                        if (val > 0) up++;
+                        else if (val < 0) down++;
+                    }
+                });
+                return { up, down };
+            }, [rawData, timeRange]);
+
+            // Handlers
+            const handleSectorClick = (sectorName) => {
+                setSelectedSector(sectorName === selectedSector ? null : sectorName);
+            };
+
+            const handleNavigate = (direction) => {
+                if (!selectedSector) return;
+                const currentIndex = displaySectors.findIndex(s => s.name === selectedSector);
+                if (currentIndex === -1) return;
+
+                let newIndex = currentIndex + direction;
+                // Wrap around
+                if (newIndex < 0) newIndex = displaySectors.length - 1;
+                if (newIndex >= displaySectors.length) newIndex = 0;
+
+                setSelectedSector(displaySectors[newIndex].name);
+            };
+
+            // Derived
+            const activeStocks = useMemo(() => {
+                if (!selectedSector) return [];
+                const sector = processedSectors.find(s => s.name === selectedSector);
+                return sector ? sector.stocks : [];
+            }, [selectedSector, processedSectors]);
+
+            return (
+                <div className="flex flex-col h-full">
+                    {/* Loading / Error Overlay */}
+                    {loading && (
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                            <LoaderIcon />
+                        </div>
+                    )}
+                    {error && (
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+                            <div className="bg-red-900/90 p-6 rounded-xl text-white max-w-md text-center border border-red-700">
+                                <h3 className="text-lg font-bold mb-2">發生錯誤</h3>
+                                <p className="mb-4">{error}</p>
+                                <button
+                                    onClick={fetchData}
+                                    className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg transition-colors"
+                                >
+                                    重試
+                                </button>
+                                <p className="mt-4 text-xs text-gray-300">提示：請檢查您的網路連線或安裝 CORS 解除擴充功能。</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 1. Header */}
+                    <header className="flex-none px-4 py-1 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                        <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden sm:block">
+                            行業板塊
+                        </h1>
+                        {/* Mobile Title (Short) */}
+                        <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent sm:hidden">
+                            板塊
+                        </h1>
+
+                        {/* Market Breadth Bar */}
+                        <MarketBreadth up={breadthStats.up} down={breadthStats.down} />
+
+                        <div className="flex items-center gap-2 sm:gap-4">
+                            {/* Refresh Button */}
+                            <button
+                                onClick={fetchData}
+                                disabled={loading}
+                                className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-50"
+                                title="重新整理"
+                            >
+                                <div className={loading ? "animate-spin" : ""}>
+                                    <RefreshIcon />
+                                </div>
+                            </button>
+
+                            {/* Dark Mode Toggle */}
+                            <button
+                                onClick={() => setDarkMode(!darkMode)}
+                                className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                            >
+                                {darkMode ? <SunIcon /> : <MoonIcon />}
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Main Content Area */}
+                    <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+                        {/* 2. Upper Panel: Sector Ranking */}
+                        <div className={`w-full flex flex-col bg-gray-50 dark:bg-gray-950 ${selectedSector ? 'h-1/3 border-b border-gray-200 dark:border-gray-800' : 'h-full'}`}>
+
+                            {/* Sorting Toolbar */}
+                            <div className="flex-none px-4 py-2 flex gap-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 sticky top-0 z-10">
+                                <button
+                                    onClick={() => setSortOrder('desc')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-bold transition-colors ${sortOrder === 'desc' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-1 ring-green-500/50' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+                                >
+                                    <ChevronUpIcon />
+                                    強勢排行
+                                </button>
+                                <button
+                                    onClick={() => setSortOrder('asc')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-bold transition-colors ${sortOrder === 'asc' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 ring-1 ring-red-500/50' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+                                >
+                                    <ChevronDownIcon />
+                                    弱勢排行
+                                </button>
+                            </div>
+
+                            {/* Scrollable Table Container */}
+                            <div ref={scrollContainerRef} className="flex-1 overflow-auto relative overscroll-none">
+                                <table className="min-w-full border-separate border-spacing-0 table-fixed">
+                                    <thead className="bg-gray-50 dark:bg-gray-950 z-20 sticky top-0">
+                                        <tr>
+                                            {/* Sticky Left Header: Current Time Range Label */}
+                                            <th className="sticky left-0 top-0 z-30 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-2 w-[240px] min-w-[240px] max-w-[240px] text-right">
+                                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{timeRange.label}</span>
+                                            </th>
+                                            {TIME_RANGES.filter(r => r.key !== timeRange.key).map(r => (
+                                                <th key={r.key} className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-2 text-right min-w-[80px]">
+                                                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{r.label}</span>
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {displaySectors.length > 0 ? displaySectors.map(sector => (
+                                            <tr key={sector.name} className="group">
+                                                {/* Sticky Left Column: Sector Card */}
+                                                <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-1 align-middle w-[140px] min-w-[140px] max-w-[140px]">
+                                                    <SectorCard
+                                                        ref={el => sectorRefs.current[sector.name] = el}
+                                                        name={sector.name}
+                                                        count={sector.stocks.length}
+                                                        change={sector.avgChange}
+                                                        maxVal={globalMaxVal}
+                                                        onClick={() => handleSectorClick(sector.name)}
+                                                        isSelected={selectedSector === sector.name}
+                                                    />
+                                                </td>
+                                                {/* Other Timeframes */}
+                                                {TIME_RANGES.filter(r => r.key !== timeRange.key).map(r => (
+                                                    <td key={r.key} className="border-b border-gray-200 dark:border-gray-800 p-1 text-right align-middle bg-white dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-900/50 min-w-[80px]">
+                                                        <span className={`text-sm font-mono font-medium ${getColorClass(sector.changes[r.key])}`}>
+                                                            {formatPercent(sector.changes[r.key])}
+                                                        </span>
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        )) : (<tr>
+                                            <td colSpan={TIME_RANGES.length} className="text-center text-gray-400 py-8 text-sm">
+                                                無數據
+                                            </td>
+                                        </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* 3. Lower Panel: Details (Conditionally Rendered) */}
+                        {selectedSector && (
+                            <div className="h-2/3 flex flex-col min-h-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10">
+                                {/* Info Header for Selected Sector */}
+                                <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b dark:border-gray-800 flex items-center justify-between flex-none">
+                                    {/* Left: Name & Count */}
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="font-bold text-lg text-blue-700 dark:text-blue-300">{selectedSector}</span>
+                                        <span className="text-sm text-gray-500 font-mono font-medium">{activeStocks.length}</span>
+                                    </div>
+
+                                    {/* Right: Navigation Buttons */}
+                                    <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-1 shadow-sm">
+                                        <button
+                                            onClick={() => handleNavigate(-1)}
+                                            className="px-4 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md transition-colors"
+                                            title="上一個板塊"
+                                        >
+                                            <NavArrowUp />
+                                        </button>
+                                        <button
+                                            onClick={() => handleNavigate(1)}
+                                            className="px-4 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md transition-colors"
+                                            title="下一個板塊"
+                                        >
+                                            <NavArrowDown />
+                                        </button>
+                                        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
+                                        <button
+                                            onClick={() => setSelectedSector(null)}
+                                            className="px-4 py-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-md transition-colors"
+                                            title="關閉"
+                                        >
+                                            <CloseIcon />
+                                        </button>
+                                    </div>
+                                </div>
+                                <StockTable stocks={activeStocks} timeRangeIdx={timeRange.idx} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 4. Bottom Navigation */}
+                    <div className="flex-none bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 pb-safe">
+
+                        {/* Time Range Selector */}
+                        <div className="flex overflow-x-auto no-scrollbar border-b border-gray-100 dark:border-gray-800 overscroll-none">
+                            {TIME_RANGES.map(range => (
+                                <button
+                                    key={range.key}
+                                    onClick={() => setTimeRange(range)}
+                                    className={`
+                                        flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap transition-colors relative
+                                        ${timeRange.key === range.key
+                                            ? 'text-blue-600 dark:text-blue-400'
+                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}
+                                    `}
+                                >
+                                    {range.label}
+                                    {timeRange.key === range.key && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 mx-2 rounded-t-full"></div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Market Switcher */}
+                        <div className="flex">
+                            {Object.values(MARKETS).map(m => (
+                                <button
+                                    key={m.id}
+                                    onClick={() => setMarket(m.id)}
+                                    className={`
+                                        flex-1 py-4 text-center font-bold transition-colors
+                                        ${market === m.id
+                                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                                            : 'bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}
+                                    `}
+                                >
+                                    {m.label}
+                                </button>
+                            ))}
+                        </div>
+                        {/* Safe area spacing for mobile */}
+                        <div className="h-[env(safe-area-inset-bottom)] bg-white dark:bg-gray-900"></div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
