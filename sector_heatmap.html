@@ -75,6 +75,22 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
+        /* 單向滾動鎖定 - 防止手機斜向滑動 */
+        .scroll-lock-vertical {
+            touch-action: pan-y;
+            overscroll-behavior-x: contain;
+        }
+
+        .scroll-lock-horizontal {
+            touch-action: pan-x;
+            overscroll-behavior-y: contain;
+        }
+
+        /* 雙向滾動容器 - 使用 contain 防止滾動穿透 */
+        .scroll-container {
+            overscroll-behavior: contain;
+        }
     </style>
 </head>
 
@@ -82,7 +98,7 @@
     <div id="root" class="h-full flex flex-col"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
         // --- Constants & Config ---
 
@@ -203,7 +219,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         );
         const RefreshIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
         );
 
         const MarketBreadth = ({ up, down }) => {
@@ -219,10 +235,10 @@
                     <div className="flex-1 h-2.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden relative flex">
                         {/* Center Marker */}
                         <div className="absolute left-1/2 top-0 bottom-0 w-0 border-l-[1.5px] border-dashed border-black/60 z-10 transform -translate-x-1/2"></div>
-                        
+
                         {/* Down Bar (Left) */}
                         <div style={{ width: `${downPct}%` }} className="bg-red-500 dark:bg-red-500 h-full transition-all duration-500" />
-                        
+
                         {/* Up Bar (Right) */}
                         <div style={{ width: `${upPct}%` }} className="bg-green-500 dark:bg-green-500 h-full transition-all duration-500" />
                     </div>
@@ -344,7 +360,7 @@
             }, [stocks, timeRangeIdx, sortConfig]);
 
             return (
-                <div className="flex-1 overflow-auto relative overscroll-none">
+                <div className="overflow-auto relative overscroll-none pb-6">
                     <table className="w-full text-sm text-left border-collapse">
                         <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400 sticky top-0 z-20 shadow-sm cursor-pointer select-none">
                             <tr>
@@ -415,24 +431,289 @@
             );
         };
 
+        // ========================================
+        // 顏色輔助函數
+        // ----------------------------------------
+        // Vol Rate 和 PE 的顏色區間計算
+        // ========================================
+
+        // Vol Rate 顏色區間
+        const getVolRateColor = (rate) => {
+            const num = parseFloat(rate);
+            if (isNaN(num)) return 'text-gray-400';
+            if (num < 0.8) return 'text-gray-400';
+            if (num < 1.2) return 'text-gray-600 dark:text-gray-300'; // 預設
+            if (num < 2.0) return 'text-yellow-500 dark:text-yellow-400';
+            if (num < 5.0) return 'text-orange-500 dark:text-orange-400';
+            return 'text-red-500 dark:text-red-400';
+        };
+
+        // PE 市盈率顏色區間
+        const getPEColor = (pe) => {
+            const num = parseFloat(pe);
+            if (isNaN(num) || num < 0) return 'text-gray-400';
+            if (num < 15) return 'text-green-500 dark:text-green-400';
+            if (num < 30) return 'text-yellow-500 dark:text-yellow-400';
+            if (num < 60) return 'text-orange-500 dark:text-orange-400';
+            return 'text-red-500 dark:text-red-400';
+        };
+
+        // ========================================
+        // MiniSectorCard
+        // ----------------------------------------
+        // 精簡版板塊卡片，用於 TurnoverList 的 Industry 欄位
+        // 樣式與 SectorCard 一致，單行固定高度
+        // ========================================
+        const MiniSectorCard = ({ name, change, count, maxVal, onClick }) => {
+            // 背景條寬度：相對於最大值計算
+            const widthPercent = maxVal > 0
+                ? Math.min(100, (Math.abs(change || 0) / maxVal) * 100)
+                : Math.min(100, (Math.abs(change || 0) / 0.1) * 100);
+
+            return (
+                <div
+                    onClick={onClick}
+                    className="relative flex items-center p-1.5 rounded-lg cursor-pointer transition-all duration-200 overflow-hidden
+                        bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-sm border border-gray-200 dark:border-gray-700"
+                    style={{ minWidth: '75px', maxWidth: '30vw', height: '28px', overflow: 'hidden' }}
+                >
+                    {/* 背景條 */}
+                    <div
+                        className={`absolute inset-y-0 left-0 opacity-25 transition-all duration-500 ${getBgColorClass(change)}`}
+                        style={{ width: `${widthPercent}%` }}
+                    />
+
+                    {/* 內容：單行 */}
+                    <div className="relative flex items-center justify-between w-full gap-1 z-10">
+                        {/* 左側：數量 + 行業名稱（可截斷） */}
+                        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
+                            {count !== undefined && (
+                                <span className="flex-shrink-0 text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-800/50 px-1 rounded">
+                                    {count}
+                                </span>
+                            )}
+                            <span className="text-xs font-medium truncate" title={name}>{name || '-'}</span>
+                        </div>
+                        {/* 右側：漲跌幅（不截斷） */}
+                        <span className={`flex-shrink-0 text-xs font-bold font-mono whitespace-nowrap ${getColorClass(change)}`}>
+                            {formatPercent(change)}
+                        </span>
+                    </div>
+                </div>
+            );
+        };
+
+        // ========================================
+        // TurnoverList
+        // ----------------------------------------
+        // 成交排行列表元件，按成交額排序顯示股票
+        // ========================================
+        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible }) => {
+            const [displayCount, setDisplayCount] = useState(50);
+            const loadMoreRef = useRef(null);
+            const scrollContainerRef = useRef(null);
+
+            // 無限滾動：IntersectionObserver
+            useEffect(() => {
+                if (!loadMoreRef.current) return;
+
+                const observer = new IntersectionObserver(
+                    (entries) => {
+                        if (entries[0].isIntersecting && displayCount < stocks.length) {
+                            setDisplayCount(prev => Math.min(prev + 50, stocks.length));
+                        }
+                    },
+                    { threshold: 0.1 }
+                );
+
+                observer.observe(loadMoreRef.current);
+                return () => observer.disconnect();
+            }, [displayCount, stocks.length]);
+
+            // 重設計數器當 stocks 改變
+            useEffect(() => {
+                setDisplayCount(50);
+            }, [stocks]);
+
+            // 顯示的股票
+            const displayStocks = useMemo(() => stocks.slice(0, displayCount), [stocks, displayCount]);
+
+            // 計算 RS (相對強弱)
+            const getRSValue = (stock) => {
+                const industry = stock.indicators[IND_IDX.INDUSTRY];
+                const stockChange = parseFloat(stock.indicators[timeRangeIdx]) || 0;
+                const sectorChange = sectorAvgChanges[industry] || 0;
+                return stockChange - sectorChange;
+            };
+
+            if (!stocks || stocks.length === 0) {
+                return (
+                    <div className="flex-1 flex items-center justify-center text-gray-500">
+                        <span>無數據</span>
+                    </div>
+                );
+            }
+
+            return (
+                <div
+                    ref={scrollContainerRef}
+                    onScroll={onScroll}
+                    className="flex-1 overflow-auto relative overscroll-none pt-10"
+                >
+                    <table className="w-full text-sm border-collapse">
+                        <thead className="sticky z-20 bg-gray-50 dark:bg-gray-900 text-xs text-gray-500 dark:text-gray-400 uppercase transition-all duration-300" style={{ top: barsVisible ? '0' : '-40px' }}>
+                            <tr>
+                                {/* Sticky: 排名 - 固定寬度，最多顯示 4 位數字 */}
+                                <th className="sticky left-0 z-30 bg-gray-50 dark:bg-gray-900 px-1 py-2 text-center w-10 min-w-[2.5rem] max-w-[2.5rem] border-b dark:border-gray-800">#</th>
+                                {/* Sticky: 股票資訊 (Icon + Info) - 自適應 */}
+                                <th className="sticky left-10 z-30 bg-gray-50 dark:bg-gray-900 px-2 py-2 text-left border-b dark:border-gray-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" style={{ width: '1%', maxWidth: 'calc(50vw - 40px)' }}>Stock</th>
+                                {/* 量比 */}
+                                <th className="px-2 py-2 text-right border-b dark:border-gray-800">Vol</th>
+                                {/* 市盈率 */}
+                                <th className="px-2 py-2 text-right border-b dark:border-gray-800">PE</th>
+                                {/* 相對強弱 */}
+                                <th className="px-2 py-2 text-right border-b dark:border-gray-800">RS</th>
+                                {/* 行業 */}
+                                <th className="px-2 py-2 text-left border-b dark:border-gray-800" style={{ width: '1%', maxWidth: '30vw' }}>Industry</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                            {displayStocks.map((stock, idx) => {
+                                const change = parseFloat(stock.indicators[timeRangeIdx]) || 0;
+                                const changeWidthPercent = Math.min(100, (Math.abs(change) / 0.1) * 100);
+                                const rsValue = getRSValue(stock);
+                                const industry = stock.indicators[IND_IDX.INDUSTRY];
+                                const isHK = market === 'HK';
+
+                                return (
+                                    <tr key={stock.code || idx} className="bg-white dark:bg-gray-950 hover:bg-gray-50 dark:hover:bg-gray-900">
+                                        {/* Sticky: 排名 - 固定寬度 */}
+                                        <td className="sticky left-0 z-10 bg-white dark:bg-gray-950 px-1 py-1 text-center text-xs text-gray-400 font-mono w-10 min-w-[2.5rem] max-w-[2.5rem]">
+                                            {idx + 1}
+                                        </td>
+                                        {/* Sticky: 股票資訊 (Icon + Info) - 自適應 */}
+                                        <td className="sticky left-10 z-10 bg-white dark:bg-gray-950 px-2 py-1 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] relative" style={{ width: '1%', maxWidth: 'calc(50vw - 40px)' }}>
+                                            {/* 背景條 */}
+                                            <div
+                                                className={`absolute inset-y-0 left-0 opacity-20 ${getBgColorClass(change)}`}
+                                                style={{ width: `${changeWidthPercent}%` }}
+                                            />
+                                            <div className="relative flex items-center gap-3 w-full overflow-hidden" style={{ maxWidth: 'calc(50vw - 2rem)' }}>
+                                                {/* Icon */}
+                                                <img
+                                                    src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`}
+                                                    alt=""
+                                                    className="w-6 h-6 rounded object-cover flex-shrink-0"
+                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                />
+                                                <div className="flex items-center gap-2 flex-nowrap flex-1 justify-between min-w-0">
+                                                    {/* 左側：名稱 + 代號 */}
+                                                    <div className="flex flex-col min-w-0">
+                                                        {isHK ? (
+                                                            <>
+                                                                <span className="font-bold text-sm truncate">{stock.name}</span>
+                                                                <span className="text-xs text-gray-400">{stock.symbol || stock.code}</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="font-bold text-sm">{stock.symbol || stock.code}</span>
+                                                                <span className="text-xs text-gray-400 truncate">{stock.name}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    {/* 右側：現價 + 漲跌幅 */}
+                                                    <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                                                        <span className="font-mono text-sm font-bold">{formatNumber(stock.indicators[IND_IDX.PRICE])}</span>
+                                                        <span className={`font-mono text-sm font-bold ${getColorClass(change)}`}>
+                                                            {formatPercent(change)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        {/* 量比 */}
+                                        <td className={`px-2 py-1 text-right font-mono text-sm ${getVolRateColor(stock.indicators[IND_IDX.VOL_RATE])}`}>
+                                            {formatNumber(stock.indicators[IND_IDX.VOL_RATE])}
+                                        </td>
+                                        {/* 市盈率 (pb_ttm) */}
+                                        <td className={`px-2 py-1 text-right font-mono text-sm ${getPEColor(stock.indicators[IND_IDX.PB])}`}>
+                                            {formatNumber(stock.indicators[IND_IDX.PB])}
+                                        </td>
+                                        {/* RS 相對強弱 */}
+                                        <td className={`px-2 py-1 text-right font-mono text-sm ${getColorClass(rsValue)}`}>
+                                            {rsValue > 0 ? '+' : ''}{(rsValue * 100).toFixed(2)}%
+                                        </td>
+                                        {/* 行業 - MiniSectorCard */}
+                                        <td className="px-2 py-1" style={{ width: '1%' }}>
+                                            <MiniSectorCard
+                                                name={industry}
+                                                change={sectorAvgChanges[industry]}
+                                                count={sectorData[industry]?.stockCount}
+                                                maxVal={globalMaxVal}
+                                                onClick={() => onMiniSectorClick && onMiniSectorClick(industry)}
+                                            />
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    {/* 載入更多的觀察點 */}
+                    {displayCount < stocks.length && (
+                        <div ref={loadMoreRef} className="py-4 text-center text-gray-400 text-sm">
+                            載入中...
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         const App = () => {
+            // ========================================
+            // App - 主應用程式元件
+            // ----------------------------------------
+            // 整合所有子元件與狀態管理
+            // ========================================
+
             // State
             const [market, setMarket] = useState('US');
             const [timeRange, setTimeRange] = useState(TIME_RANGES[0]); // Default 1D
-            const [sortOrder, setSortOrder] = useState('desc'); // 'desc' = Strongest first, 'asc' = Weakest first
+            const [viewMode, setViewMode] = useState('turnover'); // 'turnover' | 'strong' | 'weak'
             const [darkMode, setDarkMode] = useState(true);
             const [selectedSector, setSelectedSector] = useState(null);
+            const [splitViewSector, setSplitViewSector] = useState(null); // Split View 控制
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState(null);
             const [rawData, setRawData] = useState([]);
+            const [barsVisible, setBarsVisible] = useState(true); // 標題欄/導航欄可見性
 
             const sectorRefs = useRef({});
             const scrollContainerRef = useRef(null);
+            const lastScrollY = useRef(0); // 記錄上次滾動位置
+            const scrollThreshold = 10; // 滾動閾值 (px)，避免過於敏感
 
             // Effects
             useEffect(() => {
                 document.documentElement.classList.toggle('dark', darkMode);
             }, [darkMode]);
+
+            // 滾動方向偵測 - 控制標題欄與導航欄的隱藏/顯示
+            const handleMainScroll = useCallback((e) => {
+                const currentScrollY = e.target.scrollTop;
+                const delta = currentScrollY - lastScrollY.current;
+
+                // 只有超過閾值才觸發狀態變化
+                if (Math.abs(delta) > scrollThreshold) {
+                    if (delta > 0 && currentScrollY > 50) {
+                        // 向下滾動且不在頂部 -> 隱藏
+                        setBarsVisible(false);
+                    } else if (delta < 0) {
+                        // 向上滾動 -> 顯示
+                        setBarsVisible(true);
+                    }
+                    lastScrollY.current = currentScrollY;
+                }
+            }, [scrollThreshold]);
 
             useEffect(() => {
                 fetchData();
@@ -474,11 +755,11 @@
 
                 for (const proxy of PROXIES) {
                     try {
-                        // Using CORS Proxy
-                        const targetUrl = MARKETS[market].url;
+                        // Using CORS Proxy with cache-busting timestamp
+                        const targetUrl = MARKETS[market].url + '&_t=' + Date.now();
                         const proxyUrl = proxy + encodeURIComponent(targetUrl);
 
-                        const res = await fetch(proxyUrl);
+                        const res = await fetch(proxyUrl, { cache: 'no-store' });
                         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
                         const json = await res.json();
@@ -566,17 +847,19 @@
                 return sectorList.sort((a, b) => b.avgChange - a.avgChange);
             }, [rawData, timeRange]);
 
-            // Sort logic for display
+            // Sort logic for display (用於強勢/弱勢排行)
             const displaySectors = useMemo(() => {
-                return sortOrder === 'desc'
-                    ? processedSectors
-                    : [...processedSectors].reverse();
-            }, [processedSectors, sortOrder]);
+                // strong = 強勢排行（降序）, weak = 弱勢排行（升序）
+                return viewMode === 'weak'
+                    ? [...processedSectors].reverse()
+                    : processedSectors;
+            }, [processedSectors, viewMode]);
 
             // Global Max Absolute Value for consistent bar scaling
             const globalMaxVal = useMemo(() => {
                 if (processedSectors.length === 0) return 0.0001;
                 return Math.max(...processedSectors.map(s => Math.abs(s.avgChange)));
+
             }, [processedSectors]);
 
             // Calculate Market Breadth (Up/Down counts)
@@ -593,9 +876,36 @@
                 return { up, down };
             }, [rawData, timeRange]);
 
+            // 計算各板塊的市值加權平均漲跌幅 (用於 RS 計算)
+            const sectorAvgChanges = useMemo(() => {
+                const changes = {};
+                processedSectors.forEach(sector => {
+                    changes[sector.name] = sector.avgChange;
+                });
+                return changes;
+            }, [processedSectors]);
+
+            // 計算各板塊資料 (用於 MiniSectorCard)
+            const sectorData = useMemo(() => {
+                const data = {};
+                processedSectors.forEach(sector => {
+                    data[sector.name] = {
+                        stockCount: sector.stocks.length,
+                        avgChange: sector.avgChange
+                    };
+                });
+                return data;
+            }, [processedSectors]);
+
             // Handlers
             const handleSectorClick = (sectorName) => {
                 setSelectedSector(sectorName === selectedSector ? null : sectorName);
+            };
+
+            // Split View - 點擊 MiniSectorCard 時觸發
+            const handleSplitViewSectorClick = (sectorName) => {
+                if (!sectorName || sectorName === '-') return;
+                setSplitViewSector(sectorName === splitViewSector ? null : sectorName);
             };
 
             const handleNavigate = (direction) => {
@@ -642,8 +952,8 @@
                         </div>
                     )}
 
-                    {/* 1. Header */}
-                    <header className="flex-none px-4 py-1 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                    {/* 1. Header - 絕對定位，浮在內容上方，毛玉璃效果 */}
+                    <header className={`absolute top-0 left-0 right-0 z-50 px-4 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 flex items-center justify-between transition-transform duration-300 ease-out ${barsVisible ? 'translate-y-0' : '-translate-y-full'}`}>
                         <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden sm:block">
                             行業板塊
                         </h1>
@@ -678,126 +988,159 @@
                         </div>
                     </header>
 
-                    {/* Main Content Area */}
+                    {/* Main Content Area - 始終全屏，無動態 padding */}
                     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
-                        {/* 2. Upper Panel: Sector Ranking */}
-                        <div className={`w-full flex flex-col bg-gray-50 dark:bg-gray-950 ${selectedSector ? 'h-1/3 border-b border-gray-200 dark:border-gray-800' : 'h-full'}`}>
-
-                            {/* Sorting Toolbar */}
-                            <div className="flex-none px-4 py-2 flex gap-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 sticky top-0 z-10">
-                                <button
-                                    onClick={() => setSortOrder('desc')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-bold transition-colors ${sortOrder === 'desc' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-1 ring-green-500/50' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-                                >
-                                    <ChevronUpIcon />
-                                    強勢排行
-                                </button>
-                                <button
-                                    onClick={() => setSortOrder('asc')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-bold transition-colors ${sortOrder === 'asc' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 ring-1 ring-red-500/50' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-                                >
-                                    <ChevronDownIcon />
-                                    弱勢排行
-                                </button>
-                            </div>
-
-                            {/* Scrollable Table Container */}
-                            <div ref={scrollContainerRef} className="flex-1 overflow-auto relative overscroll-none">
-                                <table className="min-w-full border-separate border-spacing-0 table-fixed">
-                                    <thead className="bg-gray-50 dark:bg-gray-950 z-20 sticky top-0">
-                                        <tr>
-                                            {/* Sticky Left Header: Current Time Range Label */}
-                                            <th className="sticky left-0 top-0 z-30 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-2 w-[240px] min-w-[240px] max-w-[240px] text-right">
-                                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{timeRange.label}</span>
-                                            </th>
-                                            {TIME_RANGES.filter(r => r.key !== timeRange.key).map(r => (
-                                                <th key={r.key} className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-2 text-right min-w-[80px]">
-                                                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{r.label}</span>
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {displaySectors.length > 0 ? displaySectors.map(sector => (
-                                            <tr key={sector.name} className="group">
-                                                {/* Sticky Left Column: Sector Card */}
-                                                <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-1 align-middle w-[140px] min-w-[140px] max-w-[140px]">
-                                                    <SectorCard
-                                                        ref={el => sectorRefs.current[sector.name] = el}
-                                                        name={sector.name}
-                                                        count={sector.stocks.length}
-                                                        change={sector.avgChange}
-                                                        maxVal={globalMaxVal}
-                                                        onClick={() => handleSectorClick(sector.name)}
-                                                        isSelected={selectedSector === sector.name}
-                                                    />
-                                                </td>
-                                                {/* Other Timeframes */}
-                                                {TIME_RANGES.filter(r => r.key !== timeRange.key).map(r => (
-                                                    <td key={r.key} className="border-b border-gray-200 dark:border-gray-800 p-1 text-right align-middle bg-white dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-900/50 min-w-[80px]">
-                                                        <span className={`text-sm font-mono font-medium ${getColorClass(sector.changes[r.key])}`}>
-                                                            {formatPercent(sector.changes[r.key])}
-                                                        </span>
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        )) : (<tr>
-                                            <td colSpan={TIME_RANGES.length} className="text-center text-gray-400 py-8 text-sm">
-                                                無數據
-                                            </td>
-                                        </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* 3. Lower Panel: Details (Conditionally Rendered) */}
-                        {selectedSector && (
-                            <div className="h-2/3 flex flex-col min-h-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10">
-                                {/* Info Header for Selected Sector */}
-                                <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b dark:border-gray-800 flex items-center justify-between flex-none">
-                                    {/* Left: Name & Count */}
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="font-bold text-lg text-blue-700 dark:text-blue-300">{selectedSector}</span>
-                                        <span className="text-sm text-gray-500 font-mono font-medium">{activeStocks.length}</span>
+                        {/* 根據 viewMode 顯示不同內容 */}
+                        {viewMode === 'turnover' ? (
+                            // ========================================
+                            // 成交排行視圖
+                            // ========================================
+                            <>
+                                {/* 上方：成交排行列表 */}
+                                <div className="w-full flex flex-col min-h-0 bg-white dark:bg-gray-950 flex-1">
+                                    <TurnoverList
+                                        stocks={rawData}
+                                        market={market}
+                                        sectorAvgChanges={sectorAvgChanges}
+                                        sectorData={sectorData}
+                                        globalMaxVal={globalMaxVal}
+                                        timeRangeIdx={timeRange.idx}
+                                        onMiniSectorClick={handleSplitViewSectorClick}
+                                        onScroll={handleMainScroll}
+                                        barsVisible={barsVisible}
+                                    />
+                                </div>
+                                {/* 下方：Split View - 板塊成分股 */}
+                                {splitViewSector && (
+                                    <div className={`flex flex-col bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10 transition-all duration-300 ${barsVisible ? 'pb-40' : 'pb-4'}`} style={{ maxHeight: '66vh' }}>
+                                        {/* Split View Header */}
+                                        <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b dark:border-gray-800 flex items-center justify-between flex-none">
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="font-bold text-lg text-blue-700 dark:text-blue-300">{splitViewSector}</span>
+                                                <span className="text-sm text-gray-500 font-mono font-medium">
+                                                    {processedSectors.find(s => s.name === splitViewSector)?.stocks.length ?? 0}
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() => setSplitViewSector(null)}
+                                                className="px-3 py-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-md transition-colors"
+                                                title="關閉"
+                                            >
+                                                <CloseIcon />
+                                            </button>
+                                        </div>
+                                        <StockTable
+                                            stocks={processedSectors.find(s => s.name === splitViewSector)?.stocks || []}
+                                            timeRangeIdx={timeRange.idx}
+                                        />
                                     </div>
-
-                                    {/* Right: Navigation Buttons */}
-                                    <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-1 shadow-sm">
-                                        <button
-                                            onClick={() => handleNavigate(-1)}
-                                            className="px-4 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md transition-colors"
-                                            title="上一個板塊"
-                                        >
-                                            <NavArrowUp />
-                                        </button>
-                                        <button
-                                            onClick={() => handleNavigate(1)}
-                                            className="px-4 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md transition-colors"
-                                            title="下一個板塊"
-                                        >
-                                            <NavArrowDown />
-                                        </button>
-                                        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
-                                        <button
-                                            onClick={() => setSelectedSector(null)}
-                                            className="px-4 py-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-md transition-colors"
-                                            title="關閉"
-                                        >
-                                            <CloseIcon />
-                                        </button>
+                                )}
+                            </>
+                        ) : (
+                            // ========================================
+                            // 強勢/弱勢排行視圖
+                            // ========================================
+                            <>
+                                {/* Upper Panel: Sector Ranking */}
+                                <div className="w-full flex flex-col bg-gray-50 dark:bg-gray-950 flex-1 min-h-[200px]">
+                                    <div ref={scrollContainerRef} onScroll={handleMainScroll} className="flex-1 overflow-auto relative overscroll-none pt-10">
+                                        <table className="min-w-full border-separate border-spacing-0 table-fixed">
+                                            <thead className="bg-gray-50 dark:bg-gray-950 z-20 sticky transition-all duration-300" style={{ top: barsVisible ? '0' : '-40px' }}>
+                                                <tr>
+                                                    {/* Sticky Left Header: Current Time Range Label */}
+                                                    <th className="sticky left-0 z-30 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-2 w-[240px] min-w-[240px] max-w-[240px] text-right">
+                                                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{timeRange.label}</span>
+                                                    </th>
+                                                    {TIME_RANGES.filter(r => r.key !== timeRange.key).map(r => (
+                                                        <th key={r.key} className="bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-2 text-right min-w-[80px]">
+                                                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{r.label}</span>
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {displaySectors.length > 0 ? displaySectors.map(sector => (
+                                                    <tr key={sector.name} className="group">
+                                                        {/* Sticky Left Column: Sector Card */}
+                                                        <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-1 align-middle w-[140px] min-w-[140px] max-w-[140px]">
+                                                            <SectorCard
+                                                                ref={el => sectorRefs.current[sector.name] = el}
+                                                                name={sector.name}
+                                                                count={sector.stocks.length}
+                                                                change={sector.avgChange}
+                                                                maxVal={globalMaxVal}
+                                                                onClick={() => handleSectorClick(sector.name)}
+                                                                isSelected={selectedSector === sector.name}
+                                                            />
+                                                        </td>
+                                                        {/* Other Timeframes */}
+                                                        {TIME_RANGES.filter(r => r.key !== timeRange.key).map(r => (
+                                                            <td key={r.key} className="border-b border-gray-200 dark:border-gray-800 p-1 text-right align-middle bg-white dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-900/50 min-w-[80px]">
+                                                                <span className={`text-sm font-mono font-medium ${getColorClass(sector.changes[r.key])}`}>
+                                                                    {formatPercent(sector.changes[r.key])}
+                                                                </span>
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                )) : (<tr>
+                                                    <td colSpan={TIME_RANGES.length} className="text-center text-gray-400 py-8 text-sm">
+                                                        無數據
+                                                    </td>
+                                                </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
-                                <StockTable stocks={activeStocks} timeRangeIdx={timeRange.idx} />
-                            </div>
+
+                                {/* 3. Lower Panel: Details (Conditionally Rendered) */}
+                                {selectedSector && (
+                                    <div className={`flex flex-col bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10 transition-all duration-300 ${barsVisible ? 'pb-40' : 'pb-4'}`} style={{ maxHeight: '66vh' }}>
+                                        {/* Info Header for Selected Sector */}
+                                        <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b dark:border-gray-800 flex items-center justify-between flex-none">
+                                            {/* Left: Name & Count */}
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="font-bold text-lg text-blue-700 dark:text-blue-300">{selectedSector}</span>
+                                                <span className="text-sm text-gray-500 font-mono font-medium">{activeStocks.length}</span>
+                                            </div>
+
+                                            {/* Right: Navigation Buttons */}
+                                            <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-1 shadow-sm">
+                                                <button
+                                                    onClick={() => handleNavigate(-1)}
+                                                    className="px-4 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md transition-colors"
+                                                    title="上一個板塊"
+                                                >
+                                                    <NavArrowUp />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleNavigate(1)}
+                                                    className="px-4 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md transition-colors"
+                                                    title="下一個板塊"
+                                                >
+                                                    <NavArrowDown />
+                                                </button>
+                                                <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
+                                                <button
+                                                    onClick={() => setSelectedSector(null)}
+                                                    className="px-4 py-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-md transition-colors"
+                                                    title="關閉"
+                                                >
+                                                    <CloseIcon />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <StockTable stocks={activeStocks} timeRangeIdx={timeRange.idx} />
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
 
-                    {/* 4. Bottom Navigation */}
-                    <div className="flex-none bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 pb-safe">
+                    {/* 4. Bottom Navigation - 絕對定位，浮在內容下方，毛玉璃效果 */}
+                    <div className={`absolute bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 pb-safe transition-transform duration-300 ease-out ${barsVisible ? 'translate-y-0' : 'translate-y-full'}`}>
 
-                        {/* Time Range Selector */}
+                        {/* Time Range Selector - 時間週期 */}
                         <div className="flex overflow-x-auto no-scrollbar border-b border-gray-100 dark:border-gray-800 overscroll-none">
                             {TIME_RANGES.map(range => (
                                 <button
@@ -816,6 +1159,52 @@
                                     )}
                                 </button>
                             ))}
+                        </div>
+
+                        {/* View Mode Selector - 排行按鈕 */}
+                        <div className="flex border-b border-gray-100 dark:border-gray-800">
+                            <button
+                                onClick={() => setViewMode('turnover')}
+                                className={`
+                                    flex-1 py-2.5 text-sm font-bold transition-colors relative
+                                    ${viewMode === 'turnover'
+                                        ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}
+                                `}
+                            >
+                                成交排行
+                                {viewMode === 'turnover' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 mx-2 rounded-t-full"></div>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setViewMode('strong')}
+                                className={`
+                                    flex-1 py-2.5 text-sm font-bold transition-colors relative
+                                    ${viewMode === 'strong'
+                                        ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}
+                                `}
+                            >
+                                強勢排行
+                                {viewMode === 'strong' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 mx-2 rounded-t-full"></div>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setViewMode('weak')}
+                                className={`
+                                    flex-1 py-2.5 text-sm font-bold transition-colors relative
+                                    ${viewMode === 'weak'
+                                        ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}
+                                `}
+                            >
+                                弱勢排行
+                                {viewMode === 'weak' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500 mx-2 rounded-t-full"></div>
+                                )}
+                            </button>
                         </div>
 
                         {/* Market Switcher */}
