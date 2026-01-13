@@ -221,6 +221,9 @@
         const RefreshIcon = () => (
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
         );
+        const SearchIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+        );
 
         const MarketBreadth = ({ up, down }) => {
             const total = up + down;
@@ -504,14 +507,265 @@
         };
 
         // ========================================
+        // SearchModal
+        // ----------------------------------------
+        // 搜尋股票彈窗元件，支援跨市場模糊搜尋
+        // ========================================
+        const SearchModal = ({ isOpen, onClose, allStocksData, onSelectStock, currentMarket }) => {
+            const [query, setQuery] = useState('');
+            const [results, setResults] = useState([]);
+            const [selectedIndex, setSelectedIndex] = useState(0);
+            const inputRef = useRef(null);
+            const resultsContainerRef = useRef(null);
+
+            // 當開啟時聚焦輸入框
+            useEffect(() => {
+                if (isOpen && inputRef.current) {
+                    inputRef.current.focus();
+                    setQuery('');
+                    setResults([]);
+                    setSelectedIndex(0);
+                }
+            }, [isOpen]);
+
+            // 模糊搜尋邏輯
+            const searchStocks = useCallback((searchQuery) => {
+                if (!searchQuery.trim()) {
+                    setResults([]);
+                    return;
+                }
+
+                const q = searchQuery.toLowerCase().trim();
+                const matches = [];
+
+                // 搜尋所有市場的資料
+                Object.entries(allStocksData).forEach(([marketId, stocks]) => {
+                    if (!stocks) return;
+
+                    stocks.forEach((stock, index) => {
+                        const symbol = (stock.symbol || stock.code || '').toLowerCase();
+                        const name = (stock.name || '').toLowerCase();
+
+                        let score = 0;
+
+                        // 完全匹配
+                        if (symbol === q || name === q) {
+                            score = 100;
+                        }
+                        // 前綴匹配
+                        else if (symbol.startsWith(q) || name.startsWith(q)) {
+                            score = 80;
+                        }
+                        // 包含匹配
+                        else if (symbol.includes(q) || name.includes(q)) {
+                            score = 60;
+                        }
+
+                        if (score > 0) {
+                            matches.push({
+                                ...stock,
+                                market: marketId,
+                                originalIndex: index,
+                                score
+                            });
+                        }
+                    });
+                });
+
+                // 排序：分數高的在前，同分時當前市場優先
+                matches.sort((a, b) => {
+                    if (b.score !== a.score) return b.score - a.score;
+                    if (a.market === currentMarket && b.market !== currentMarket) return -1;
+                    if (b.market === currentMarket && a.market !== currentMarket) return 1;
+                    return 0;
+                });
+
+                setResults(matches.slice(0, 15));
+                setSelectedIndex(0);
+            }, [allStocksData, currentMarket]);
+
+            // Debounce 搜尋
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    searchStocks(query);
+                }, 300);
+                return () => clearTimeout(timer);
+            }, [query, searchStocks]);
+
+            // 確保選中項目在可視區域內
+            useEffect(() => {
+                if (resultsContainerRef.current && results.length > 0) {
+                    const container = resultsContainerRef.current;
+                    const selectedItem = container.children[selectedIndex];
+                    if (selectedItem) {
+                        selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                }
+            }, [selectedIndex, results.length]);
+
+            // 鍵盤導航
+            const handleKeyDown = (e) => {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setSelectedIndex(prev => Math.max(prev - 1, 0));
+                } else if (e.key === 'Enter' && results.length > 0) {
+                    e.preventDefault();
+                    handleSelect(results[selectedIndex]);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    onClose();
+                }
+            };
+
+            const handleSelect = (stock) => {
+                onSelectStock(stock);
+                onClose();
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div
+                    className="fixed inset-0 z-[100] flex items-start justify-center pt-16 px-4"
+                    onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+                >
+                    {/* 背景遮罩 */}
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+
+                    {/* 搜尋框容器 */}
+                    <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        {/* 搜尋輸入 */}
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                            <SearchIcon />
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="搜尋股票代碼或名稱..."
+                                className="flex-1 bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400"
+                                autoComplete="off"
+                            />
+                            {query && (
+                                <button
+                                    onClick={() => setQuery('')}
+                                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                >
+                                    <CloseIcon />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* 搜尋結果 */}
+                        {results.length > 0 && (
+                            <div ref={resultsContainerRef} className="max-h-80 overflow-y-auto">
+                                {results.map((stock, idx) => {
+                                    const change = parseFloat(stock.indicators?.[IND_IDX.CHG_1D]) || 0;
+                                    const price = stock.indicators?.[IND_IDX.PRICE];
+
+                                    return (
+                                        <div
+                                            key={`${stock.market}-${stock.code}-${idx}`}
+                                            onClick={() => handleSelect(stock)}
+                                            onMouseEnter={() => setSelectedIndex(idx)}
+                                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${idx === selectedIndex
+                                                ? 'bg-blue-50 dark:bg-blue-900/30'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                                                }`}
+                                        >
+                                            {/* 市場標籤 */}
+                                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${stock.market === 'US'
+                                                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
+                                                : 'bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400'
+                                                }`}>
+                                                {stock.market}
+                                            </span>
+
+                                            {/* 股票資訊 */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="font-bold text-gray-900 dark:text-white">
+                                                        {stock.symbol || stock.code}
+                                                    </span>
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                                        {stock.name}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* 價格和漲跌幅 */}
+                                            <div className="flex flex-col items-end flex-shrink-0">
+                                                <span className="font-mono text-sm">{formatNumber(price)}</span>
+                                                <span className={`font-mono text-sm ${getColorClass(change)}`}>
+                                                    {formatPercent(change)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* 無結果提示 */}
+                        {query && results.length === 0 && (
+                            <div className="px-4 py-8 text-center text-gray-500">
+                                找不到符合「{query}」的股票
+                            </div>
+                        )}
+
+                        {/* 提示文字 */}
+                        {!query && (
+                            <div className="px-4 py-6 text-center text-gray-400 text-sm">
+                                輸入股票代碼或公司名稱開始搜尋<br />
+                                <span className="text-xs mt-1 block">支援 US 和 HK 市場</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // ========================================
         // TurnoverList
         // ----------------------------------------
         // 成交排行列表元件，按成交額排序顯示股票
         // ========================================
-        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible }) => {
+        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible, highlightedStockCode }) => {
             const [displayCount, setDisplayCount] = useState(50);
             const loadMoreRef = useRef(null);
             const scrollContainerRef = useRef(null);
+            const stockRowRefs = useRef({});
+
+            // 高亮股票時自動滾動到該位置
+            useEffect(() => {
+                if (highlightedStockCode && scrollContainerRef.current) {
+                    // 先確保股票已被載入 (displayCount 足夠)
+                    const stockIndex = stocks.findIndex(s => s.code === highlightedStockCode);
+                    if (stockIndex >= 0 && stockIndex >= displayCount) {
+                        // 需要載入更多股票
+                        setDisplayCount(Math.min(stockIndex + 50, stocks.length));
+                    }
+
+                    // 延遲滾動，等待 DOM 更新
+                    setTimeout(() => {
+                        const rowElement = stockRowRefs.current[highlightedStockCode];
+                        if (rowElement && scrollContainerRef.current) {
+                            const container = scrollContainerRef.current;
+                            const headerHeight = 50;
+                            const targetTop = rowElement.offsetTop - headerHeight;
+
+                            container.scrollTo({
+                                top: targetTop,
+                                behavior: 'smooth'
+                            });
+                        }
+                    }, 100);
+                }
+            }, [highlightedStockCode, stocks, displayCount]);
 
             // 無限滾動：IntersectionObserver
             useEffect(() => {
@@ -584,9 +838,17 @@
                                 const rsValue = getRSValue(stock);
                                 const industry = stock.indicators[IND_IDX.INDUSTRY];
                                 const isHK = market === 'HK';
+                                const isHighlighted = highlightedStockCode === stock.code;
 
                                 return (
-                                    <tr key={stock.code || idx} className="bg-white dark:bg-gray-950 hover:bg-gray-50 dark:hover:bg-gray-900">
+                                    <tr
+                                        key={stock.code || idx}
+                                        ref={el => stockRowRefs.current[stock.code] = el}
+                                        className={`hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors ${isHighlighted
+                                            ? 'bg-yellow-100 dark:bg-yellow-900/30 ring-2 ring-yellow-400 dark:ring-yellow-500'
+                                            : 'bg-white dark:bg-gray-950'
+                                            }`}
+                                    >
                                         {/* Sticky: 排名 - 固定寬度 */}
                                         <td className="sticky left-0 z-10 bg-white dark:bg-gray-950 px-1 py-1 text-center text-xs text-gray-400 font-mono w-10 min-w-[2.5rem] max-w-[2.5rem]">
                                             {idx + 1}
@@ -623,7 +885,7 @@
                                                     </div>
                                                     {/* 右側：現價 + 漲跌幅 */}
                                                     <div className="flex flex-col items-end flex-shrink-0 ml-2">
-                                                        <span className="font-mono text-sm font-bold">{formatNumber(stock.indicators[IND_IDX.PRICE])}</span>
+                                                        <span className={`font-mono text-sm font-bold ${getColorClass(change)}`}>{formatNumber(stock.indicators[IND_IDX.PRICE])}</span>
                                                         <span className={`font-mono text-sm font-bold ${getColorClass(change)}`}>
                                                             {formatPercent(change)}
                                                         </span>
@@ -686,6 +948,11 @@
             const [error, setError] = useState(null);
             const [rawData, setRawData] = useState([]);
             const [barsVisible, setBarsVisible] = useState(true); // 標題欄/導航欄可見性
+
+            // 搜尋相關狀態
+            const [searchOpen, setSearchOpen] = useState(false);
+            const [highlightedStock, setHighlightedStock] = useState(null);
+            const [allStocksData, setAllStocksData] = useState({ US: [], HK: [] }); // 跨市場搜尋用
 
             const sectorRefs = useRef({});
             const scrollContainerRef = useRef(null);
@@ -767,6 +1034,8 @@
                         // Handle nested data structure: response.data.list
                         if (json.data && Array.isArray(json.data.list)) {
                             setRawData(json.data.list);
+                            // 同時更新 allStocksData 供搜尋使用
+                            setAllStocksData(prev => ({ ...prev, [market]: json.data.list }));
                             setLoading(false); // Success
                             return; // Exit function on success
                         } else {
@@ -784,6 +1053,59 @@
                 setError(lastError ? lastError.message : "Failed to fetch data");
                 setLoading(false);
             };
+
+            // 初始載入時，預先載入另一個市場的資料供搜尋使用
+            const fetchOtherMarketData = async (otherMarket) => {
+                const PROXIES = [
+                    'https://corsproxy.io/?',
+                    'https://api.codetabs.com/v1/proxy?quest='
+                ];
+
+                for (const proxy of PROXIES) {
+                    try {
+                        const targetUrl = MARKETS[otherMarket].url + '&_t=' + Date.now();
+                        const proxyUrl = proxy + encodeURIComponent(targetUrl);
+
+                        const res = await fetch(proxyUrl, { cache: 'no-store' });
+                        if (!res.ok) continue;
+
+                        const json = await res.json();
+                        if (json.data && Array.isArray(json.data.list)) {
+                            setAllStocksData(prev => ({ ...prev, [otherMarket]: json.data.list }));
+                            return;
+                        }
+                    } catch (err) {
+                        console.warn(`Prefetch ${otherMarket} failed:`, err);
+                    }
+                }
+            };
+
+            // 搜尋選擇處理函數
+            const handleSearchSelect = useCallback((stock) => {
+                // 如果選中的股票在不同市場，先切換市場
+                if (stock.market !== market) {
+                    setMarket(stock.market);
+                }
+
+                // 切換到成交排行視圖
+                setViewMode('turnover');
+
+                // 設定高亮股票
+                setHighlightedStock(stock.code);
+
+                // 3 秒後清除高亮
+                setTimeout(() => {
+                    setHighlightedStock(null);
+                }, 3000);
+            }, [market]);
+
+            // 初始化時預載另一個市場的資料
+            useEffect(() => {
+                const otherMarket = market === 'US' ? 'HK' : 'US';
+                if (allStocksData[otherMarket].length === 0) {
+                    fetchOtherMarketData(otherMarket);
+                }
+            }, [market]);
 
             // Process Data: Group and Calculate
             const processedSectors = useMemo(() => {
@@ -966,6 +1288,15 @@
                         <MarketBreadth up={breadthStats.up} down={breadthStats.down} />
 
                         <div className="flex items-center gap-2 sm:gap-4">
+                            {/* Search Button */}
+                            <button
+                                onClick={() => setSearchOpen(true)}
+                                className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                                title="搜尋股票"
+                            >
+                                <SearchIcon />
+                            </button>
+
                             {/* Refresh Button */}
                             <button
                                 onClick={fetchData}
@@ -1008,6 +1339,7 @@
                                         onMiniSectorClick={handleSplitViewSectorClick}
                                         onScroll={handleMainScroll}
                                         barsVisible={barsVisible}
+                                        highlightedStockCode={highlightedStock}
                                     />
                                 </div>
                                 {/* 下方：Split View - 板塊成分股 */}
@@ -1227,6 +1559,15 @@
                         {/* Safe area spacing for mobile */}
                         <div className="h-[env(safe-area-inset-bottom)] bg-white dark:bg-gray-900"></div>
                     </div>
+
+                    {/* Search Modal */}
+                    <SearchModal
+                        isOpen={searchOpen}
+                        onClose={() => setSearchOpen(false)}
+                        allStocksData={allStocksData}
+                        onSelectStock={handleSearchSelect}
+                        currentMarket={market}
+                    />
                 </div>
             );
         };
