@@ -1,15 +1,15 @@
 # Stock Sector Heatmap (板塊強弱勢排行)
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 一個基於 Web 的即時股市板塊熱力圖工具，專為分析美股 (US) 與港股 (HK) 的板塊強弱勢而設計。透過視覺化的方式，快速掌握市場資金流向與板塊輪動。
 
 ## 📸 介面預覽
 
-| 成交排行 | 強勢排行 |
-|:---:|:---:|
-| ![成交排行](https://github.com/hin88188/stock-sector-heatmap/blob/main/screenshots/turnover_list.png) | ![強勢排行](https://github.com/hin88188/stock-sector-heatmap/blob/main/screenshots/strong_ranking.png) |
+| 成交排行 | 成交排行（詳細） | 強勢排行 |
+|:---:|:---:|:---:|
+| ![成交排行](https://github.com/hin88188/stock-sector-heatmap/blob/main/screenshots/turnover_list.png) | ![成交排行（詳細）](https://github.com/hin88188/stock-sector-heatmap/blob/main/screenshots/turnover_list_detail.png) | ![強勢排行](https://github.com/hin88188/stock-sector-heatmap/blob/main/screenshots/strong_ranking.png) |
 
 ## ✨ 特色功能
 
@@ -24,6 +24,7 @@
 - **現代化設計**：
   - **響應式佈局 (Responsive)**：完美支援桌機與行動裝置。
   - **深色模式 (Dark Mode)**：預設深色主題，並可一鍵切換淺色模式，適合長時間看盤。
+  - **設定面板**：可調整字型大小 (50%-200%) 及外觀模式，設定自動保存。
 
 ## 🚀 快速開始
 
@@ -64,25 +65,12 @@ stock-sector-heatmap/
 
 ## 📝 版本紀錄
 
-### v1.2.0 (2026-01-14)
-- ✨ 新增搜尋股票功能，支援跨市場模糊搜尋
-- ✨ 點擊搜尋結果自動滾動定位並高亮顯示股票
-- ✨ 支援鍵盤導航 (↑↓ 選擇, Enter 確認, Esc 關閉)
-- 🎨 搜尋框搭配毛玻璃效果，符合現有 UI 風格
-- 🎨 成交排行中股價顏色改為跟隨漲跌幅顏色
+**最新版本: v1.3.0** (2026-01-15)
+- 新增設定面板，整合外觀模式與字型大小調整
+- 新增回到頂部浮動按鈕
+- 多項響應式佈局優化
 
-### v1.1.0 (2025-12-13)
-- ✨ 新增成交排行視圖作為預設首頁
-- ✨ 新增滾動隱藏/顯示導航列功能
-- ✨ Split View 高度自適應（成份股少時占用較少空間）
-- 🎨 添加毛玉璃效果增強視覺體驗
-- 🐛 修復載入更多股票後 sticky 欄位位移問題
-
-### v1.0.0 (2025-12-03)
-- 🎉 首次發布
-- 實作美股/港股板塊熱力圖
-- 實作市值加權漲跌幅計算
-- 整合深色/淺色模式切換
+👉 [查看完整更新日誌](CHANGELOG.md)
 
 ## 🤝 貢獻
 
