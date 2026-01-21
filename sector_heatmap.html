@@ -481,7 +481,7 @@
                     onClick={onClick}
                     className="relative flex items-center p-1.5 rounded-lg cursor-pointer transition-all duration-200 overflow-hidden
                         bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-sm border border-gray-200 dark:border-gray-700"
-                    style={{ minWidth: '75px', maxWidth: '30vw', height: '28px', overflow: 'hidden' }}
+                    style={{ minWidth: '75px', height: '28px', overflow: 'hidden' }}
                 >
                     {/* 背景條 */}
                     <div
@@ -733,140 +733,153 @@
         };
 
         // ========================================
-        // TurnoverList
+        // TurnoverList (Virtual Scrolling)
         // ----------------------------------------
-        // 成交排行列表元件，按成交額排序顯示股票
+        // 成交排行列表元件，使用虛擬滾動技術
+        // 只渲染可視區域的元素，支援 2000+ 筆資料流暢滾動
         // ========================================
-        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible, highlightedStockCode }) => {
-            const [displayCount, setDisplayCount] = useState(50);
+        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible, highlightedStockCode, fontSizePercent = 100 }) => {
+            // 虛擬滾動核心變數
+            const ROW_HEIGHT_EXPANDED = 30; // 展開模式每列高度 (px) - 單行
+            const ROW_HEIGHT_COLLAPSED = 44; // 收起模式每列高度 (px) - 雙行
+            const BUFFER_COUNT = 8; // 上下緩衝區列數
+
+            // 狀態
+            const [scrollTop, setScrollTop] = useState(0);
+            const [containerHeight, setContainerHeight] = useState(600); // 預設容器高度
             const [stockExpanded, setStockExpanded] = useState(() => {
                 const saved = localStorage.getItem('stockExpanded');
                 return saved !== null ? saved === 'true' : true; // 預設展開
             });
-            const [showScrollTop, setShowScrollTop] = useState(false); // 回到頂部按鈕顯示狀態
-            const loadMoreRef = useRef(null);
+            const [showScrollTop, setShowScrollTop] = useState(false);
+
+            // Refs
             const scrollContainerRef = useRef(null);
-            const stockRowRefs = useRef({});
-            const hideTimerRef = useRef(null); // 5秒自動隱藏計時器
+            const hideTimerRef = useRef(null);
 
             // 保存展開/收起狀態到 localStorage
             useEffect(() => {
                 localStorage.setItem('stockExpanded', stockExpanded.toString());
             }, [stockExpanded]);
 
+            // 測量容器高度
+            useEffect(() => {
+                if (scrollContainerRef.current) {
+                    const resizeObserver = new ResizeObserver((entries) => {
+                        for (const entry of entries) {
+                            setContainerHeight(entry.contentRect.height);
+                        }
+                    });
+                    resizeObserver.observe(scrollContainerRef.current);
+                    setContainerHeight(scrollContainerRef.current.clientHeight);
+                    return () => resizeObserver.disconnect();
+                }
+            }, [stocks, stockExpanded]); // 添加依賴：視圖切換或資料變化時重新測量
+
+            // 計算可視區域 - 動態行高（混合方案：≤100% 固定行高，>100% 縮放）
+            const fontScale = fontSizePercent > 100 ? fontSizePercent / 100 : 1;
+            const rowHeight = stockExpanded
+                ? Math.ceil(ROW_HEIGHT_EXPANDED * fontScale)
+                : Math.ceil(ROW_HEIGHT_COLLAPSED * fontScale);
+
+            // 動態欄位寬度（混合方案：≤100% 固定寬度，>100% 縮放）
+            const colWidthVol = Math.ceil(50 * fontScale);
+            const colWidthPE = Math.ceil(70 * fontScale);
+            const colWidthRS = Math.ceil(70 * fontScale);
+            const colWidthIndustry = Math.ceil(150 * fontScale);
+
+            const visibleCount = Math.ceil(containerHeight / rowHeight) + 1;
+
+            // 計算應渲染的資料範圍
+            const { startIndex, endIndex, topSpacerHeight, bottomSpacerHeight } = useMemo(() => {
+                const totalCount = stocks.length;
+                const start = Math.max(0, Math.floor(scrollTop / rowHeight) - BUFFER_COUNT);
+                const end = Math.min(totalCount, Math.floor(scrollTop / rowHeight) + visibleCount + BUFFER_COUNT);
+
+                return {
+                    startIndex: start,
+                    endIndex: end,
+                    topSpacerHeight: start * rowHeight,
+                    bottomSpacerHeight: Math.max(0, (totalCount - end) * rowHeight)
+                };
+            }, [scrollTop, stocks.length, visibleCount, rowHeight]);
+
             // 清除計時器
-            const clearHideTimer = () => {
+            const clearHideTimer = useCallback(() => {
                 if (hideTimerRef.current) {
                     clearTimeout(hideTimerRef.current);
                     hideTimerRef.current = null;
                 }
-            };
+            }, []);
 
             // 設定 5 秒自動隱藏
-            const startHideTimer = () => {
+            const startHideTimer = useCallback(() => {
                 clearHideTimer();
                 hideTimerRef.current = setTimeout(() => {
                     setShowScrollTop(false);
                 }, 5000);
-            };
+            }, [clearHideTimer]);
 
-            // 部測捲動事件以顯示/隱藏回到頂部按鈕
-            const handleScroll = (e) => {
+            // 處理滾動事件
+            const handleScroll = useCallback((e) => {
+                const newScrollTop = e.target.scrollTop;
+                setScrollTop(newScrollTop);
+
+                // 呼叫父元件的 onScroll
                 onScroll && onScroll(e);
-                const scrollTop = e.target.scrollTop;
-                if (scrollTop > 0) {
+
+                // 控制回到頂部按鈕
+                if (newScrollTop > 0) {
                     setShowScrollTop(true);
                     startHideTimer();
                 } else {
                     setShowScrollTop(false);
                     clearHideTimer();
                 }
-            };
+            }, [onScroll, startHideTimer, clearHideTimer]);
 
-            // 回到頂部並重置顯示數量
-            const scrollToTop = () => {
-                // 先重置顯示數量，讓列表縮短
-                setDisplayCount(50);
-                // 延遲後滾動到頂部（等待 DOM 更新）
-                setTimeout(() => {
-                    if (scrollContainerRef.current) {
-                        scrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
-                    }
-                }, 50);
+            // 回到頂部
+            const scrollToTop = useCallback(() => {
+                if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+                }
                 setShowScrollTop(false);
                 clearHideTimer();
-            };
-
-            // 組件卸載時清除計時器
-            useEffect(() => {
-                return () => clearHideTimer();
-            }, []);
+            }, [clearHideTimer]);
 
             // 高亮股票時自動滾動到該位置
             useEffect(() => {
                 if (highlightedStockCode && scrollContainerRef.current) {
-                    // 先確保股票已被載入 (displayCount 足夠)
                     const stockIndex = stocks.findIndex(s => s.code === highlightedStockCode);
-                    if (stockIndex >= 0 && stockIndex >= displayCount) {
-                        // 需要載入更多股票
-                        setDisplayCount(Math.min(stockIndex + 50, stocks.length));
+                    if (stockIndex >= 0) {
+                        const targetScrollTop = stockIndex * rowHeight - containerHeight / 2 + rowHeight / 2;
+                        scrollContainerRef.current.scrollTo({
+                            top: Math.max(0, targetScrollTop),
+                            behavior: 'smooth'
+                        });
                     }
-
-                    // 延遲滾動，等待 DOM 更新
-                    setTimeout(() => {
-                        const rowElement = stockRowRefs.current[highlightedStockCode];
-                        if (rowElement && scrollContainerRef.current) {
-                            const container = scrollContainerRef.current;
-                            const headerHeight = 50;
-                            const targetTop = rowElement.offsetTop - headerHeight;
-
-                            container.scrollTo({
-                                top: targetTop,
-                                behavior: 'smooth'
-                            });
-                        }
-                    }, 100);
                 }
-            }, [highlightedStockCode, stocks, displayCount]);
+            }, [highlightedStockCode, stocks, containerHeight]);
 
-            // 無限滾動：IntersectionObserver
+            // 組件卸載時清除計時器
             useEffect(() => {
-                if (!loadMoreRef.current) return;
-
-                const observer = new IntersectionObserver(
-                    (entries) => {
-                        if (entries[0].isIntersecting && displayCount < stocks.length) {
-                            setDisplayCount(prev => Math.min(prev + 50, stocks.length));
-                        }
-                    },
-                    { threshold: 0.1 }
-                );
-
-                observer.observe(loadMoreRef.current);
-                return () => observer.disconnect();
-            }, [displayCount, stocks.length]);
-
-            // 重設計數器當 stocks 改變
-            useEffect(() => {
-                setDisplayCount(50);
-            }, [stocks]);
-
-            // 顯示的股票
-            const displayStocks = useMemo(() => stocks.slice(0, displayCount), [stocks, displayCount]);
+                return () => clearHideTimer();
+            }, [clearHideTimer]);
 
             // 計算 RS (相對強弱)
-            const getRSValue = (stock) => {
+            const getRSValue = useCallback((stock) => {
                 const industry = stock.indicators[IND_IDX.INDUSTRY];
                 const stockChange = parseFloat(stock.indicators[timeRangeIdx]) || 0;
                 const sectorChange = sectorAvgChanges[industry] || 0;
                 return stockChange - sectorChange;
-            };
+            }, [timeRangeIdx, sectorAvgChanges]);
 
             // 切換展開/收起
-            const toggleStockExpanded = () => {
+            const toggleStockExpanded = useCallback(() => {
                 setStockExpanded(prev => !prev);
-            };
+            }, []);
 
+            // 空資料處理
             if (!stocks || stocks.length === 0) {
                 return (
                     <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -876,6 +889,10 @@
             }
 
             const isHK = market === 'HK';
+            const totalHeight = stocks.length * rowHeight;
+
+            // 取得可視範圍內的股票資料
+            const visibleStocks = stocks.slice(startIndex, endIndex);
 
             return (
                 <div
@@ -883,174 +900,210 @@
                     onScroll={handleScroll}
                     className="flex-1 overflow-y-auto overflow-x-auto relative overscroll-none pt-10"
                 >
-                    <table className="w-full text-sm border-collapse">
-                        <thead className="sticky z-20 bg-gray-50 dark:bg-gray-900 text-xs text-gray-500 dark:text-gray-400 uppercase transition-all duration-300" style={{ top: barsVisible ? '0' : '-40px' }}>
-                            <tr>
-                                {/* Sticky: 排名 - 固定寬度，最多顯示 4 位數字 */}
-                                <th className="sticky left-0 z-30 bg-gray-50 dark:bg-gray-900 px-1 py-2 text-center w-10 min-w-[2.5rem] max-w-[2.5rem] border-b dark:border-gray-800">#</th>
-                                {/* Sticky: 股票資訊 (Icon + Info) - 可點擊切換展開/收起 */}
-                                <th
-                                    className="sticky left-10 z-30 bg-gray-50 dark:bg-gray-900 px-2 py-2 text-left border-b dark:border-gray-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none transition-colors"
-                                    style={{ width: stockExpanded ? 'auto' : '1%', maxWidth: stockExpanded ? 'none' : 'calc(50vw - 40px)' }}
-                                    onClick={toggleStockExpanded}
-                                >
-                                    <span className="flex items-center gap-1">
-                                        Stock {stockExpanded ? '«' : '»'}
-                                    </span>
-                                </th>
-                                {/* 展開模式下隱藏其他欄位 */}
-                                {!stockExpanded && (
+                    <div style={{ height: totalHeight, position: 'relative' }}>
+                        {/* 表頭 - 固定在頂部 */}
+                        <table
+                            className="text-sm border-collapse"
+                            style={{
+                                position: 'sticky',
+                                top: 0,
+                                zIndex: 20,
+                                tableLayout: 'fixed',
+                                width: stockExpanded ? '100%' : 'max(100%, 530px)'
+                            }}
+                        >
+                            {/* 欄寬定義 */}
+                            <colgroup>
+                                <col style={{ width: '40px' }} />
+                                {stockExpanded ? (
+                                    <col style={{ width: 'auto' }} />
+                                ) : (
                                     <>
-                                        {/* 量比 */}
-                                        <th className="px-2 py-2 text-right border-b dark:border-gray-800">Vol</th>
-                                        {/* 市盈率 */}
-                                        <th className="px-2 py-2 text-right border-b dark:border-gray-800">PE</th>
-                                        {/* 相對強弱 */}
-                                        <th className="px-2 py-2 text-right border-b dark:border-gray-800">RS</th>
-                                        {/* 行業 */}
-                                        <th className="px-2 py-2 text-left border-b dark:border-gray-800" style={{ width: '1%', maxWidth: '30vw' }}>Industry</th>
+                                        <col style={{ width: 'clamp(170px, calc(50vw - 40px), 300px)' }} />
+                                        <col style={{ width: `${colWidthVol}px` }} />
+                                        <col style={{ width: `${colWidthPE}px` }} />
+                                        <col style={{ width: `${colWidthRS}px` }} />
+                                        <col style={{ minWidth: `${colWidthIndustry}px` }} />
                                     </>
                                 )}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                            {displayStocks.map((stock, idx) => {
-                                const change = parseFloat(stock.indicators[timeRangeIdx]) || 0;
-                                const changeWidthPercent = Math.min(100, (Math.abs(change) / 0.1) * 100);
-                                const rsValue = getRSValue(stock);
-                                const industry = stock.indicators[IND_IDX.INDUSTRY];
-                                const isHighlighted = highlightedStockCode === stock.code;
-
-                                return (
-                                    <tr
-                                        key={stock.code || idx}
-                                        ref={el => stockRowRefs.current[stock.code] = el}
-                                        className={`hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors ${isHighlighted
-                                            ? 'bg-yellow-100 dark:bg-yellow-900/30 ring-2 ring-yellow-400 dark:ring-yellow-500'
-                                            : 'bg-white dark:bg-gray-950'
-                                            }`}
+                            </colgroup>
+                            <thead className="bg-gray-50 dark:bg-gray-900 text-xs text-gray-500 dark:text-gray-400 uppercase transition-all duration-300" style={{ transform: barsVisible ? 'translateY(0)' : 'translateY(-40px)' }}>
+                                <tr>
+                                    {/* Sticky: 排名 */}
+                                    <th className="sticky left-0 z-30 bg-gray-50 dark:bg-gray-900 px-1 py-2 text-center border-b border-gray-200 dark:border-gray-800 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)]" style={{ width: '40px' }}>#</th>
+                                    {/* Sticky: 股票資訊 */}
+                                    <th
+                                        className="sticky z-30 bg-gray-50 dark:bg-gray-900 px-2 py-2 text-left border-b border-gray-200 dark:border-gray-800 shadow-[2px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[2px_0_0_0_rgba(255,255,255,0.05)] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-850 select-none transition-colors whitespace-nowrap"
+                                        style={{ left: '40px' }}
+                                        onClick={toggleStockExpanded}
                                     >
-                                        {/* Sticky: 排名 - 固定寬度 */}
-                                        <td className={`sticky left-0 z-10 px-1 py-1 text-center text-xs text-gray-400 font-mono w-10 min-w-[2.5rem] max-w-[2.5rem] ${isHighlighted ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-white dark:bg-gray-950'}`}>
-                                            {idx + 1}
-                                        </td>
-                                        {/* Sticky: 股票資訊 - 根據展開狀態切換佈局 */}
-                                        <td className={`sticky left-10 z-10 px-2 py-1 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] relative overflow-hidden ${isHighlighted ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-white dark:bg-gray-950'}`} style={{ width: stockExpanded ? 'calc(100vw - 40px)' : '1%', maxWidth: stockExpanded ? 'calc(100vw - 40px)' : 'calc(50vw - 40px)' }}>
-                                            {/* 背景條 */}
-                                            <div
-                                                className={`absolute inset-y-0 left-0 opacity-20 ${getBgColorClass(change)}`}
-                                                style={{ width: `${changeWidthPercent}%` }}
-                                            />
-                                            {stockExpanded ? (
-                                                /* 展開模式：水平一行排列，名稱可縮小 */
-                                                <div className="relative flex items-center w-full">
-                                                    {/* Icon - 固定寬度 32px */}
-                                                    <div className="flex-shrink-0 w-8">
-                                                        <img
-                                                            src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`}
-                                                            alt=""
-                                                            className="w-6 h-6 rounded object-cover"
-                                                            onError={(e) => { e.target.style.display = 'none'; }}
-                                                        />
-                                                    </div>
-                                                    {/* 代號/名稱區域 - 使用 flex-1 overflow-hidden 讓名稱優先縮小 */}
-                                                    <div className="flex items-center flex-1 min-w-0 overflow-hidden">
-                                                        {isHK ? (
-                                                            <>
-                                                                {/* 港股：名稱（可縮小到0）- 代號（固定寬度） */}
-                                                                <span className="font-bold text-sm truncate flex-1 min-w-0" title={stock.name}>{stock.name}</span>
-                                                                <span className="text-xs text-gray-400 w-16 ml-2 flex-shrink-0 text-left">{stock.symbol || stock.code}</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                {/* 美股：代號（固定寬度）- 名稱（可縮小到0） */}
-                                                                <span className="font-bold text-sm w-16 flex-shrink-0">{stock.symbol || stock.code}</span>
-                                                                <span className="text-xs text-gray-400 ml-2 truncate min-w-0" title={stock.name}>{stock.name}</span>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    {/* 現價和漲跌幅 - 固定寬度，不縮小 */}
-                                                    <span className={`font-mono text-sm font-bold w-20 text-right flex-shrink-0 ${getColorClass(change)}`}>
-                                                        {formatNumber(stock.indicators[IND_IDX.PRICE])}
-                                                    </span>
-                                                    <span className={`font-mono text-sm font-bold w-20 text-right flex-shrink-0 ${getColorClass(change)}`}>
-                                                        {formatPercent(change)}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                /* 收起模式：原本的兩行佈局 */
-                                                <div className="relative flex items-center gap-3 w-full overflow-hidden" style={{ maxWidth: 'calc(50vw - 2rem)' }}>
-                                                    {/* Icon */}
-                                                    <img
-                                                        src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`}
-                                                        alt=""
-                                                        className="w-6 h-6 rounded object-cover flex-shrink-0"
-                                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                        Stock {stockExpanded ? '«' : '»'}
+                                    </th>
+                                    {/* 收起模式下顯示其他欄位 */}
+                                    {!stockExpanded && (
+                                        <>
+                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">Vol</th>
+                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">PE</th>
+                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">RS</th>
+                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">Industry</th>
+                                        </>
+                                    )}
+                                </tr>
+                            </thead>
+                        </table>
+
+                        {/* 虛擬滾動內容 */}
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingTop: topSpacerHeight + 30 }}>
+                            <table
+                                className="text-sm border-collapse"
+                                style={{
+                                    tableLayout: 'fixed',
+                                    width: stockExpanded ? '100%' : 'max(100%, 530px)'
+                                }}
+                            >
+                                {/* 欄寬定義 - 與表頭相同 */}
+                                <colgroup>
+                                    <col style={{ width: '40px' }} />
+                                    {stockExpanded ? (
+                                        <col style={{ width: 'auto' }} />
+                                    ) : (
+                                        <>
+                                            <col style={{ width: 'clamp(170px, calc(50vw - 40px), 300px)' }} />
+                                            <col style={{ width: `${colWidthVol}px` }} />
+                                            <col style={{ width: `${colWidthPE}px` }} />
+                                            <col style={{ width: `${colWidthRS}px` }} />
+                                            <col style={{ minWidth: `${colWidthIndustry}px` }} />
+                                        </>
+                                    )}
+                                </colgroup>
+
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                                    {visibleStocks.map((stock, localIdx) => {
+                                        const realIndex = startIndex + localIdx;
+                                        const change = parseFloat(stock.indicators[timeRangeIdx]) || 0;
+                                        const changeWidthPercent = Math.min(100, (Math.abs(change) / 0.1) * 100);
+                                        const rsValue = getRSValue(stock);
+                                        const industry = stock.indicators[IND_IDX.INDUSTRY];
+                                        const isHighlighted = highlightedStockCode === stock.code;
+
+                                        return (
+                                            <tr
+                                                key={stock.code || realIndex}
+                                                className={`hover:bg-gray-50 dark:hover:bg-gray-900/50 active:bg-gray-100 dark:active:bg-gray-900 transition-colors ${isHighlighted
+                                                    ? 'bg-yellow-100 dark:bg-yellow-900/30 ring-2 ring-yellow-400 dark:ring-yellow-500'
+                                                    : 'bg-white dark:bg-gray-950'
+                                                    }`}
+                                                style={{ height: rowHeight }}
+                                            >
+                                                {/* Sticky: 排名 */}
+                                                <td className={`sticky left-0 z-10 px-1 py-1 text-center text-xs text-gray-500 dark:text-gray-400 font-mono shadow-[1px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)] hover:bg-gray-50 dark:hover:bg-gray-900/50 ${isHighlighted ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-white dark:bg-gray-950'}`} style={{ width: '40px' }}>
+                                                    {realIndex + 1}
+                                                </td>
+                                                {/* Sticky: 股票資訊 */}
+                                                <td className={`sticky z-10 px-2 py-1 shadow-[2px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[2px_0_0_0_rgba(255,255,255,0.05)] relative overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-900/50 ${isHighlighted ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-white dark:bg-gray-950'}`} style={{ left: '40px' }}>
+                                                    {/* 背景條 */}
+                                                    <div
+                                                        className={`absolute inset-y-0 left-0 opacity-20 ${getBgColorClass(change)}`}
+                                                        style={{ width: `${changeWidthPercent}%` }}
                                                     />
-                                                    <div className="flex items-center gap-2 flex-nowrap flex-1 justify-between min-w-0">
-                                                        {/* 左側：名稱 + 代號 */}
-                                                        <div className="flex flex-col min-w-0">
-                                                            {isHK ? (
-                                                                <>
-                                                                    <span className="font-bold text-sm truncate">{stock.name}</span>
-                                                                    <span className="text-xs text-gray-400">{stock.symbol || stock.code}</span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <span className="font-bold text-sm">{stock.symbol || stock.code}</span>
-                                                                    <span className="text-xs text-gray-400 truncate">{stock.name}</span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                        {/* 右側：現價 + 漲跌幅 */}
-                                                        <div className="flex flex-col items-end flex-shrink-0 ml-2">
-                                                            <span className={`font-mono text-sm font-bold ${getColorClass(change)}`}>{formatNumber(stock.indicators[IND_IDX.PRICE])}</span>
-                                                            <span className={`font-mono text-sm font-bold ${getColorClass(change)}`}>
+                                                    {stockExpanded ? (
+                                                        /* 展開模式：水平一行排列 */
+                                                        <div className="relative flex items-center w-full">
+                                                            <div className="flex-shrink-0 w-8">
+                                                                <img
+                                                                    src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`}
+                                                                    alt=""
+                                                                    className="w-6 h-6 rounded object-cover"
+                                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                                    loading="lazy"
+                                                                />
+                                                            </div>
+                                                            <div className="flex items-center flex-1 min-w-0 overflow-hidden">
+                                                                {isHK ? (
+                                                                    <>
+                                                                        <span className="font-bold text-sm truncate flex-1 min-w-0" title={stock.name}>{stock.name}</span>
+                                                                        <span className="text-xs text-gray-400 w-16 ml-2 flex-shrink-0 text-left">{stock.symbol || stock.code}</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="font-bold text-sm w-16 flex-shrink-0">{stock.symbol || stock.code}</span>
+                                                                        <span className="text-xs text-gray-400 ml-2 truncate min-w-0" title={stock.name}>{stock.name}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                            <span className={`font-mono text-sm font-bold w-20 text-right flex-shrink-0 ${getColorClass(change)}`}>
+                                                                {formatNumber(stock.indicators[IND_IDX.PRICE])}
+                                                            </span>
+                                                            <span className={`font-mono text-sm font-bold w-20 text-right flex-shrink-0 ${getColorClass(change)}`}>
                                                                 {formatPercent(change)}
                                                             </span>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </td>
-                                        {/* 展開模式下隱藏其他欄位 */}
-                                        {!stockExpanded && (
-                                            <>
-                                                {/* 量比 */}
-                                                <td className={`px-2 py-1 text-right font-mono text-sm ${getVolRateColor(stock.indicators[IND_IDX.VOL_RATE])}`}>
-                                                    {formatNumber(stock.indicators[IND_IDX.VOL_RATE])}
+                                                    ) : (
+                                                        /* 收起模式：兩行佈局 */
+                                                        <div className="relative flex items-center gap-2 w-full overflow-hidden">
+                                                            <img
+                                                                src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`}
+                                                                alt=""
+                                                                className="w-6 h-6 rounded object-cover flex-shrink-0"
+                                                                onError={(e) => { e.target.style.display = 'none'; }}
+                                                                loading="lazy"
+                                                            />
+                                                            <div className="flex items-center gap-2 flex-nowrap flex-1 justify-between min-w-0">
+                                                                <div className="flex flex-col min-w-0">
+                                                                    {isHK ? (
+                                                                        <>
+                                                                            <span className="font-bold text-sm truncate">{stock.name}</span>
+                                                                            <span className="text-xs text-gray-400">{stock.symbol || stock.code}</span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span className="font-bold text-sm">{stock.symbol || stock.code}</span>
+                                                                            <span className="text-xs text-gray-400 truncate">{stock.name}</span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                                                                    <span className={`font-mono text-sm font-bold ${getColorClass(change)}`}>{formatNumber(stock.indicators[IND_IDX.PRICE])}</span>
+                                                                    <span className={`font-mono text-sm font-bold ${getColorClass(change)}`}>
+                                                                        {formatPercent(change)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </td>
-                                                {/* 市盈率 (pb_ttm) */}
-                                                <td className={`px-2 py-1 text-right font-mono text-sm ${getPEColor(stock.indicators[IND_IDX.PB])}`}>
-                                                    {formatNumber(stock.indicators[IND_IDX.PB])}
-                                                </td>
-                                                {/* RS 相對強弱 */}
-                                                <td className={`px-2 py-1 text-right font-mono text-sm ${getColorClass(rsValue)}`}>
-                                                    {rsValue > 0 ? '+' : ''}{(rsValue * 100).toFixed(2)}%
-                                                </td>
-                                                {/* 行業 - MiniSectorCard */}
-                                                <td className="px-2 py-1" style={{ width: '1%' }}>
-                                                    <MiniSectorCard
-                                                        name={industry}
-                                                        change={sectorAvgChanges[industry]}
-                                                        count={sectorData[industry]?.stockCount}
-                                                        maxVal={globalMaxVal}
-                                                        onClick={() => onMiniSectorClick && onMiniSectorClick(industry)}
-                                                    />
-                                                </td>
-                                            </>
-                                        )}
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                    {/* 載入更多的觀察點 */}
-                    {displayCount < stocks.length && (
-                        <div ref={loadMoreRef} className="py-4 text-center text-gray-400 text-sm">
-                            載入中...
+                                                {/* 收起模式下顯示其他欄位 */}
+                                                {!stockExpanded && (
+                                                    <>
+                                                        <td className={`px-2 py-1 text-right font-mono text-sm ${getVolRateColor(stock.indicators[IND_IDX.VOL_RATE])}`}>
+                                                            {formatNumber(stock.indicators[IND_IDX.VOL_RATE])}
+                                                        </td>
+                                                        <td className={`px-2 py-1 text-right font-mono text-sm ${getPEColor(stock.indicators[IND_IDX.PB])}`}>
+                                                            {formatNumber(stock.indicators[IND_IDX.PB])}
+                                                        </td>
+                                                        <td className={`px-2 py-1 text-right font-mono text-sm ${getColorClass(rsValue)}`}>
+                                                            {rsValue > 0 ? '+' : ''}{(rsValue * 100).toFixed(2)}%
+                                                        </td>
+                                                        <td className="px-2 py-1">
+                                                            <MiniSectorCard
+                                                                name={industry}
+                                                                change={sectorAvgChanges[industry]}
+                                                                count={sectorData[industry]?.stockCount}
+                                                                maxVal={globalMaxVal}
+                                                                onClick={() => onMiniSectorClick && onMiniSectorClick(industry)}
+                                                            />
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
-                    )}
+                    </div>
+
+
                     {/* 回到頂部浮動按鈕 */}
                     {showScrollTop && (
                         <button
@@ -1076,9 +1129,22 @@
             // ========================================
 
             // State
-            const [market, setMarket] = useState('US');
-            const [timeRange, setTimeRange] = useState(TIME_RANGES[0]); // Default 1D
-            const [viewMode, setViewMode] = useState('turnover'); // 'turnover' | 'strong' | 'weak'
+            // 讀取市場設定（預設：美股）
+            const [market, setMarket] = useState(() => {
+                const saved = localStorage.getItem('market');
+                return saved || 'US';
+            });
+            // 讀取時間週期設定（預設：1D）
+            const [timeRange, setTimeRange] = useState(() => {
+                const saved = localStorage.getItem('timeRange');
+                const savedIdx = parseInt(saved, 10);
+                return !isNaN(savedIdx) && savedIdx >= 0 && savedIdx < TIME_RANGES.length ? TIME_RANGES[savedIdx] : TIME_RANGES[0];
+            });
+            // 讀取排行模式設定（預設：成交排行）
+            const [viewMode, setViewMode] = useState(() => {
+                const saved = localStorage.getItem('viewMode');
+                return saved || 'turnover';
+            });
             const [selectedSector, setSelectedSector] = useState(null);
             const [splitViewSector, setSplitViewSector] = useState(null); // Split View 控制
             const [loading, setLoading] = useState(false);
@@ -1113,6 +1179,15 @@
             const decreaseFontSize = () => setFontSizePercent(prev => Math.max(prev - 10, 50));
             const resetFontSize = () => setFontSizePercent(100);
 
+            // 重置所有設定為預設值
+            const resetAllSettings = () => {
+                setDarkMode(true);          // 預設暗黑模式
+                setFontSizePercent(100);    // 預設字型 100%
+                setMarket('US');            // 預設美股
+                setViewMode('turnover');    // 預設成交排行
+                setTimeRange(TIME_RANGES[0]); // 預設 1D
+            };
+
             // 讀取暗黑模式設定
             const [darkMode, setDarkMode] = useState(() => {
                 const saved = localStorage.getItem('darkMode');
@@ -1123,6 +1198,22 @@
             useEffect(() => {
                 localStorage.setItem('darkMode', darkMode);
             }, [darkMode]);
+
+            // 儲存市場設定
+            useEffect(() => {
+                localStorage.setItem('market', market);
+            }, [market]);
+
+            // 儲存時間週期設定
+            useEffect(() => {
+                const idx = TIME_RANGES.indexOf(timeRange);
+                localStorage.setItem('timeRange', idx.toString());
+            }, [timeRange]);
+
+            // 儲存排行模式設定
+            useEffect(() => {
+                localStorage.setItem('viewMode', viewMode);
+            }, [viewMode]);
 
             const sectorRefs = useRef({});
             const scrollContainerRef = useRef(null);
@@ -1611,6 +1702,17 @@
                                                     </button>
                                                 </div>
                                             </div>
+
+                                            {/* 重置所有設定 */}
+                                            <div style={{ padding: '12px 16px', borderTop: '1px solid' }} className="border-gray-200 dark:border-gray-700">
+                                                <button
+                                                    onClick={resetAllSettings}
+                                                    style={{ fontSize: '13px', padding: '10px 16px', width: '100%' }}
+                                                    className="rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium transition-colors active:scale-95 transform"
+                                                >
+                                                    🔄 重置所有設定
+                                                </button>
+                                            </div>
                                         </div>
                                     </>
                                 )}
@@ -1639,6 +1741,7 @@
                                         onScroll={handleMainScroll}
                                         barsVisible={barsVisible}
                                         highlightedStockCode={highlightedStock}
+                                        fontSizePercent={fontSizePercent}
                                     />
                                 </div>
                                 {/* 下方：Split View - 板塊成分股 */}
