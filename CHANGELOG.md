@@ -2,6 +2,29 @@
 
 本文件記錄所有版本的更新內容。格式基於 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.0.0/)。
 
+## [v1.4.1] - 2026-01-22
+
+### 新增
+- ♿ 無障礙性支援：
+  - 為所有 icon-only 按鈕添加 `aria-label`
+  - 為搜尋輸入框添加關聯的 `<label>`
+  - 添加 `focus-visible` 樣式提供清晰的鍵盤焦點指示
+  - 支援 `prefers-reduced-motion` 尊重使用者動態偏好
+- ✨ 新增 Skeleton Loading 元件，提升初次載入視覺體驗
+- ✨ 新增 `.sr-only` 類別支援螢幕閱讀器
+
+### 優化
+- ⚡ React 效能優化：
+  - 為 `MarketBreadth`、`SectorCard`、`MiniSectorCard` 添加 `React.memo`
+  - 使用 `useCallback` 優化 `handleSectorClick` 等 event handlers
+  - 使用 functional updates 優化 setState 呼叫
+- 🎨 替換設定面板中的 Emoji（☀️、🌙、🔄）為 SVG 圖示
+
+### 修復
+- 🐛 移除 viewport 的 `user-scalable=no` 限制，允許使用者縮放頁面
+
+---
+
 ## [v1.4.0] - 2026-01-22
 
 ### 新增
