@@ -20,6 +20,11 @@
                             750: '#2d3748',
                             850: '#1a202c',
                             950: '#0d1117',
+                        },
+                        quote: {
+                            up: '#06A870',      // 綠
+                            down: '#F03A55',    // 紅
+                            neutral: '#646F85', // 灰
                         }
                     }
                 }
@@ -202,16 +207,23 @@
         };
 
         const getColorClass = (val) => {
-            if (!val && val !== 0) return 'text-gray-500';
-            if (val > 0) return 'text-green-500 dark:text-green-400';
-            if (val < 0) return 'text-red-500 dark:text-red-400';
-            return 'text-gray-500 dark:text-gray-400';
+            if (!val && val !== 0) return 'text-quote-neutral';
+            if (val > 0) return 'text-quote-up';
+            if (val < 0) return 'text-quote-down';
+            return 'text-quote-neutral';
         };
 
         const getBgColorClass = (val) => {
-            if (val > 0) return 'bg-green-500';
-            if (val < 0) return 'bg-red-500';
-            return 'bg-gray-500';
+            if (val > 0) return 'bg-quote-up';
+            if (val < 0) return 'bg-quote-down';
+            return 'bg-quote-neutral';
+        };
+
+        // Helper for Pill Background (always white text)
+        const getBgPillColor = (val) => {
+            if (val > 0) return 'bg-quote-up';
+            if (val < 0) return 'bg-quote-down';
+            return 'bg-quote-neutral';
         };
 
         // --- Icons ---
@@ -786,9 +798,9 @@
                                             </div>
 
                                             {/* 價格和漲跌幅 */}
-                                            <div className="flex flex-col items-end flex-shrink-0">
-                                                <span className="font-mono text-sm">{formatNumber(price)}</span>
-                                                <span className={`font-mono text-sm ${getColorClass(change)}`}>
+                                            <div className="flex flex-col items-end flex-shrink-0 gap-1">
+                                                <span className="font-mono text-sm font-bold text-gray-900 dark:text-white">{formatNumber(price)}</span>
+                                                <span className={`px-1.5 py-0.5 rounded text-white font-bold font-mono text-xs ${getBgColorClass(change)}`}>
                                                     {formatPercent(change)}
                                                 </span>
                                             </div>
@@ -823,7 +835,7 @@
         // 成交排行列表元件，使用虛擬滾動技術
         // 只渲染可視區域的元素，支援 2000+ 筆資料流暢滾動
         // ========================================
-        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible, highlightedStockCode, fontSizePercent = 100 }) => {
+        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible, highlightedStockCode, fontSizePercent = 100, headerHeight = 40 }) => {
             // 虛擬滾動核心變數
             const ROW_HEIGHT_EXPANDED = 30; // 展開模式每列高度 (px) - 單行
             const ROW_HEIGHT_COLLAPSED = 44; // 收起模式每列高度 (px) - 雙行
@@ -983,7 +995,7 @@
                 <div
                     ref={scrollContainerRef}
                     onScroll={handleScroll}
-                    className="flex-1 overflow-y-auto overflow-x-auto relative overscroll-none pt-10"
+                    className="flex-1 overflow-y-auto overflow-x-auto relative overscroll-none"
                 >
                     <div style={{ height: totalHeight, position: 'relative' }}>
                         {/* 表頭 - 固定在頂部 */}
@@ -1012,7 +1024,7 @@
                                     </>
                                 )}
                             </colgroup>
-                            <thead className="bg-gray-50 dark:bg-gray-900 text-xs text-gray-500 dark:text-gray-400 uppercase transition-all duration-300" style={{ transform: barsVisible ? 'translateY(0)' : 'translateY(-40px)' }}>
+                            <thead className="bg-gray-50 dark:bg-gray-900 text-xs text-gray-500 dark:text-gray-400 uppercase">
                                 <tr>
                                     {/* Sticky: 排名 */}
                                     <th className="sticky left-0 z-30 bg-gray-50 dark:bg-gray-900 px-1 py-2 text-center border-b border-gray-200 dark:border-gray-800 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)]" style={{ width: '40px' }}>#</th>
@@ -1116,10 +1128,10 @@
                                                                     </>
                                                                 )}
                                                             </div>
-                                                            <span className={`font-mono text-sm font-bold w-20 text-right flex-shrink-0 ${getColorClass(change)}`}>
+                                                            <span className="font-mono text-sm font-bold text-right whitespace-nowrap flex-shrink-0 text-gray-900 dark:text-white">
                                                                 {formatNumber(stock.indicators[IND_IDX.PRICE])}
                                                             </span>
-                                                            <span className={`font-mono text-sm font-bold w-20 text-right flex-shrink-0 ${getColorClass(change)}`}>
+                                                            <span className={`ml-2 px-1.5 py-0.5 rounded text-white font-bold w-20 flex justify-center items-center font-mono text-xs whitespace-nowrap flex-shrink-0 ${getBgPillColor(change)}`}>
                                                                 {formatPercent(change)}
                                                             </span>
                                                         </div>
@@ -1147,9 +1159,11 @@
                                                                         </>
                                                                     )}
                                                                 </div>
-                                                                <div className="flex flex-col items-end flex-shrink-0 ml-2">
-                                                                    <span className={`font-mono text-sm font-bold ${getColorClass(change)}`}>{formatNumber(stock.indicators[IND_IDX.PRICE])}</span>
-                                                                    <span className={`font-mono text-sm font-bold ${getColorClass(change)}`}>
+                                                                <div className="flex flex-col items-end flex-shrink-0 ml-2 gap-1">
+                                                                    <span className="font-mono text-sm font-bold text-gray-900 dark:text-white">
+                                                                        {formatNumber(stock.indicators[IND_IDX.PRICE])}
+                                                                    </span>
+                                                                    <span className={`px-1.5 py-0.5 rounded text-white font-bold font-mono text-xs ${getBgPillColor(change)}`}>
                                                                         {formatPercent(change)}
                                                                     </span>
                                                                 </div>
@@ -1193,7 +1207,8 @@
                     {showScrollTop && (
                         <button
                             onClick={scrollToTop}
-                            className={`fixed right-4 w-12 h-12 rounded-full bg-gray-800/80 dark:bg-gray-200/80 text-white dark:text-gray-800 flex items-center justify-center shadow-lg hover:bg-gray-700/90 dark:hover:bg-gray-300/90 transition-all duration-300 z-50 ${barsVisible ? 'bottom-36' : 'bottom-6'}`}
+                            className="fixed right-4 w-12 h-12 rounded-full bg-gray-800/80 dark:bg-gray-200/80 text-white dark:text-gray-800 flex items-center justify-center shadow-lg hover:bg-gray-700/90 dark:hover:bg-gray-300/90 z-50"
+                            style={{ bottom: barsVisible ? 144 : 24, transition: 'bottom 300ms ease-out' }}
                             title="回到頂部"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1302,6 +1317,8 @@
 
             const sectorRefs = useRef({});
             const scrollContainerRef = useRef(null);
+            const headerRef = useRef(null); // Header 元素參考
+            const [headerHeight, setHeaderHeight] = useState(40); // Header 動態高度
             const lastScrollY = useRef(0); // 記錄上次滾動位置
             const scrollThreshold = 10; // 滾動閾值 (px)，避免過於敏感
             const hideTimerRef = useRef(null); // 回到頂部按鈕 5 秒自動隱藏計時器
@@ -1325,6 +1342,19 @@
             // 組件卸載時清除計時器
             useEffect(() => {
                 return () => clearHideTimer();
+            }, []);
+
+            // 動態測量 Header 高度
+            useEffect(() => {
+                if (!headerRef.current) return;
+                const observer = new ResizeObserver((entries) => {
+                    for (const entry of entries) {
+                        setHeaderHeight(entry.contentRect.height);
+                    }
+                });
+                observer.observe(headerRef.current);
+                setHeaderHeight(headerRef.current.offsetHeight);
+                return () => observer.disconnect();
             }, []);
 
             // Effects
@@ -1672,7 +1702,7 @@
                     )}
 
                     {/* 1. Header - 絕對定位，浮在內容上方，毛玉璃效果 */}
-                    <header className={`absolute top-0 left-0 right-0 z-50 px-4 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 flex items-center justify-between transition-transform duration-300 ease-out ${barsVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+                    <header ref={headerRef} className="fixed top-0 left-0 right-0 z-50 px-4 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                         <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden sm:block">
                             行業板塊
                         </h1>
@@ -1827,7 +1857,7 @@
                             // ========================================
                             <>
                                 {/* 上方：成交排行列表 */}
-                                <div className="w-full flex flex-col min-h-0 bg-white dark:bg-gray-950 flex-1">
+                                <div className="w-full flex flex-col min-h-0 bg-white dark:bg-gray-950 flex-1" style={{ paddingTop: headerHeight }}>
                                     <TurnoverList
                                         stocks={rawData}
                                         market={market}
@@ -1840,6 +1870,7 @@
                                         barsVisible={barsVisible}
                                         highlightedStockCode={highlightedStock}
                                         fontSizePercent={fontSizePercent}
+                                        headerHeight={headerHeight}
                                     />
                                 </div>
                                 {/* 下方：Split View - 板塊成分股 */}
@@ -1874,10 +1905,10 @@
                             // ========================================
                             <>
                                 {/* Upper Panel: Sector Ranking */}
-                                <div className="w-full flex flex-col bg-gray-50 dark:bg-gray-950 flex-1 min-h-[200px]">
-                                    <div ref={scrollContainerRef} onScroll={handleMainScroll} className="flex-1 overflow-auto relative overscroll-none pt-10">
+                                <div className="w-full flex flex-col bg-gray-50 dark:bg-gray-950 flex-1 min-h-[200px]" style={{ paddingTop: headerHeight }}>
+                                    <div ref={scrollContainerRef} onScroll={handleMainScroll} className="flex-1 overflow-auto relative overscroll-none">
                                         <table className="min-w-full border-separate border-spacing-0 table-fixed">
-                                            <thead className="bg-gray-50 dark:bg-gray-950 z-20 sticky transition-all duration-300" style={{ top: barsVisible ? '0' : '-40px' }}>
+                                            <thead className="bg-gray-50 dark:bg-gray-950 z-20 sticky" style={{ top: 0 }}>
                                                 <tr>
                                                     {/* Sticky Left Header: Current Time Range Label */}
                                                     <th className="sticky left-0 z-30 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 p-2 text-right" style={{ minWidth: '140px', maxWidth: '50vw' }}>
@@ -1974,7 +2005,8 @@
                             viewMode !== 'turnover' && showScrollTop && (
                                 <button
                                     onClick={scrollToTop}
-                                    className={`fixed right-4 w-12 h-12 rounded-full bg-gray-800/80 dark:bg-gray-200/80 text-white dark:text-gray-800 flex items-center justify-center shadow-lg hover:bg-gray-700/90 dark:hover:bg-gray-300/90 transition-all duration-300 z-50 ${barsVisible ? 'bottom-36' : 'bottom-6'}`}
+                                    className="fixed right-4 w-12 h-12 rounded-full bg-gray-800/80 dark:bg-gray-200/80 text-white dark:text-gray-800 flex items-center justify-center shadow-lg hover:bg-gray-700/90 dark:hover:bg-gray-300/90 z-50"
+                                    style={{ bottom: barsVisible ? 144 : 24, transition: 'bottom 300ms ease-out' }}
                                     title="回到頂部"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1986,7 +2018,7 @@
                     </div >
 
                     {/* 4. Bottom Navigation - 絕對定位，浮在內容下方，毛玉璃效果 */}
-                    < div className={`absolute bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 pb-safe transition-transform duration-300 ease-out ${barsVisible ? 'translate-y-0' : 'translate-y-full'}`}>
+                    <div className={`fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 pb-safe transition-transform duration-300 ease-out ${barsVisible ? 'translate-y-0' : 'translate-y-full'}`}>
 
                         {/* Time Range Selector - 時間週期 */}
                         < div className="flex overflow-x-auto no-scrollbar border-b border-gray-100 dark:border-gray-800 overscroll-none" >
