@@ -134,16 +134,151 @@
 
         // --- Constants & Config ---
 
+        const TRANSLATIONS = {
+            'zh-HK': {
+                title: '板塊強弱勢排行',
+                market_us: '美股',
+                market_hk: '港股',
+                col_symbol: '代號',
+                col_name: '名稱',
+                col_price: '現價',
+                col_mcap: '市值',
+                col_turnover: '成交額',
+                col_vol: '量比',
+                col_pe: '市盈率',
+                col_rs: '相對強弱',
+                col_industry: '行業',
+                col_stock: '股票',
+                col_rank: '排名',
+                msg_select_sector: '請選擇上方板塊以查看詳情',
+                msg_no_data: '無數據',
+                msg_search_placeholder: '搜尋股票代碼或名稱...',
+                msg_search_no_result: '找不到符合「{query}」的股票',
+                msg_search_instruction: '輸入股票代碼或公司名稱開始搜尋',
+                msg_search_support: '支援 US 和 HK 市場',
+                msg_error: '發生錯誤',
+                msg_retry: '重試',
+                msg_error_hint: '提示：請檢查您的網路連線或安裝 CORS 解除擴充功能。',
+                settings_title: '設定',
+                settings_theme: '外觀模式',
+                settings_theme_light: '明亮',
+                settings_theme_dark: '暗黑',
+                settings_fontsize: '字型大小',
+                settings_language: '語言',
+                settings_reset: '重置所有設定',
+                view_turnover: '成交排行',
+                view_strong: '強勢排行',
+                view_weak: '弱勢排行',
+                tooltip_search: '搜尋股票',
+                tooltip_refresh: '重新整理',
+                tooltip_settings: '設定',
+                tooltip_top: '回到頂部',
+                tooltip_prev_sector: '上一個板塊',
+                tooltip_next_sector: '下一個板塊',
+                tooltip_close: '關閉',
+                tooltip_reset_font: '點擊重置為 100%',
+                loading: '載入中...',
+            },
+            'zh-CN': {
+                title: '板块强弱势排行',
+                market_us: '美股',
+                market_hk: '港股',
+                col_symbol: '代码',
+                col_name: '名称',
+                col_price: '现价',
+                col_mcap: '市值',
+                col_turnover: '成交额',
+                col_vol: '量比',
+                col_pe: '市盈率',
+                col_rs: '相对强弱',
+                col_industry: '行业',
+                col_stock: '股票',
+                col_rank: '排名',
+                msg_select_sector: '请选择上方板块以查看详情',
+                msg_no_data: '无数据',
+                msg_search_placeholder: '搜索股票代码或名称...',
+                msg_search_no_result: '找不到符合“{query}”的股票',
+                msg_search_instruction: '输入股票代码或公司名称开始搜索',
+                msg_search_support: '支持 US 和 HK 市场',
+                msg_error: '发生错误',
+                msg_retry: '重试',
+                msg_error_hint: '提示：请检查您的网络连接或安装 CORS 解除扩充功能。',
+                settings_title: '设置',
+                settings_theme: '外观模式',
+                settings_theme_light: '明亮',
+                settings_theme_dark: '暗黑',
+                settings_fontsize: '字体大小',
+                settings_language: '语言',
+                settings_reset: '重置所有设置',
+                view_turnover: '成交排行',
+                view_strong: '强势排行',
+                view_weak: '弱势排行',
+                tooltip_search: '搜索股票',
+                tooltip_refresh: '刷新',
+                tooltip_settings: '设置',
+                tooltip_top: '回到顶部',
+                tooltip_prev_sector: '上一个板块',
+                tooltip_next_sector: '下一个板块',
+                tooltip_close: '关闭',
+                tooltip_reset_font: '点击重置为 100%',
+                loading: '加载中...',
+            },
+            'en': {
+                title: 'Sector Heatmap',
+                market_us: 'US',
+                market_hk: 'HK',
+                col_symbol: 'Symbol',
+                col_name: 'Name',
+                col_price: 'Price',
+                col_mcap: 'M.Cap',
+                col_turnover: 'Turnover',
+                col_vol: 'Vol/Rate',
+                col_pe: 'P/E',
+                col_rs: 'RS',
+                col_industry: 'Industry',
+                col_stock: 'Stock',
+                col_rank: 'Rank',
+                msg_select_sector: 'Select a sector above to view details',
+                msg_no_data: 'No Data',
+                msg_search_placeholder: 'Search symbol or name...',
+                msg_search_no_result: 'No results for "{query}"',
+                msg_search_instruction: 'Enter symbol or company name to search',
+                msg_search_support: 'Supports US and HK markets',
+                msg_error: 'Error Occurred',
+                msg_retry: 'Retry',
+                msg_error_hint: 'Tip: Check your connection or install CORS extension.',
+                settings_title: 'Settings',
+                settings_theme: 'Appearance',
+                settings_theme_light: 'Light',
+                settings_theme_dark: 'Dark',
+                settings_fontsize: 'Font Size',
+                settings_language: 'Language',
+                settings_reset: 'Reset All Settings',
+                view_turnover: 'Turnover',
+                view_strong: 'Gainers',
+                view_weak: 'Losers',
+                tooltip_search: 'Search Stocks',
+                tooltip_refresh: 'Refresh',
+                tooltip_settings: 'Settings',
+                tooltip_top: 'Scroll to Top',
+                tooltip_prev_sector: 'Previous Sector',
+                tooltip_next_sector: 'Next Sector',
+                tooltip_close: 'Close',
+                tooltip_reset_font: 'Click to reset to 100%',
+                loading: 'Loading...',
+            }
+        };
+
         const MARKETS = {
             US: {
                 id: 'US',
-                label: '美股',
+                labelKey: 'market_us',
                 limit: 2000,
                 url: 'https://m-gl.lbkrs.com/api/forward/newmarket/revision/rank/pc/list?key=all&market=US&indicators[]=last_done&indicators[]=chg&indicators[]=change&indicators[]=total_amount&indicators[]=total_balance&indicators[]=five_min_chg&indicators[]=turnover_rate&indicators[]=amplitude&indicators[]=volume_rate&indicators[]=depth_rate&indicators[]=pb_ttm&indicators[]=market_cap&indicators[]=five_day_chg&indicators[]=ten_day_chg&indicators[]=twenty_day_chg&indicators[]=this_year_chg&indicators[]=half_year_chg&indicators[]=industry&sort_indicator=total_balance&order=desc&offset=0&limit=2000'
             },
             HK: {
                 id: 'HK',
-                label: '港股',
+                labelKey: 'market_hk',
                 limit: 300,
                 url: 'https://m-gl.lbkrs.com/api/forward/newmarket/revision/rank/pc/list?key=all&market=HK&indicators[]=last_done&indicators[]=chg&indicators[]=change&indicators[]=total_amount&indicators[]=total_balance&indicators[]=five_min_chg&indicators[]=turnover_rate&indicators[]=amplitude&indicators[]=volume_rate&indicators[]=depth_rate&indicators[]=pb_ttm&indicators[]=market_cap&indicators[]=five_day_chg&indicators[]=ten_day_chg&indicators[]=twenty_day_chg&indicators[]=this_year_chg&indicators[]=half_year_chg&indicators[]=industry&sort_indicator=total_balance&order=desc&offset=0&limit=300'
             }
@@ -387,7 +522,7 @@
             );
         }));
 
-        const StockTable = ({ stocks, timeRangeIdx }) => {
+        const StockTable = ({ stocks, timeRangeIdx, t }) => {
             const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
             // Reset sort when sector changes (stocks prop changes)
@@ -398,7 +533,7 @@
             if (!stocks || stocks.length === 0) {
                 return (
                     <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                        <p>請選擇上方板塊以查看詳情</p>
+                        <p>{t('msg_select_sector')}</p>
                     </div>
                 );
             }
@@ -465,13 +600,13 @@
                         <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400 sticky top-0 z-20 shadow-sm cursor-pointer select-none">
                             <tr>
                                 <th scope="col" onClick={() => handleSort('symbol')} className="px-3 py-3 sticky left-0 z-30 bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-20 min-w-[5rem] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                    代號 <span className="text-[10px] ml-0.5">{getSortIcon('symbol')}</span>
+                                    {t('col_symbol')} <span className="text-[10px] ml-0.5">{getSortIcon('symbol')}</span>
                                 </th>
                                 <th scope="col" onClick={() => handleSort('name')} className="px-3 py-3 sticky left-20 z-30 bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-28 min-w-[7rem] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                    名稱 <span className="text-[10px] ml-0.5">{getSortIcon('name')}</span>
+                                    {t('col_name')} <span className="text-[10px] ml-0.5">{getSortIcon('name')}</span>
                                 </th>
                                 <th scope="col" onClick={() => handleSort(IND_IDX.PRICE)} className="px-3 py-3 whitespace-nowrap border-b dark:border-gray-700 text-right hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                    現價 <span className="text-[10px] ml-0.5">{getSortIcon(IND_IDX.PRICE)}</span>
+                                    {t('col_price')} <span className="text-[10px] ml-0.5">{getSortIcon(IND_IDX.PRICE)}</span>
                                 </th>
 
                                 {TIME_RANGES.map(range => (
@@ -486,10 +621,10 @@
                                 ))}
 
                                 <th scope="col" onClick={() => handleSort(IND_IDX.MCAP)} className="px-3 py-3 whitespace-nowrap border-b dark:border-gray-700 text-right text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                    市值 <span className="text-[10px] ml-0.5">{getSortIcon(IND_IDX.MCAP)}</span>
+                                    {t('col_mcap')} <span className="text-[10px] ml-0.5">{getSortIcon(IND_IDX.MCAP)}</span>
                                 </th>
                                 <th scope="col" onClick={() => handleSort(IND_IDX.BALANCE)} className="px-3 py-3 whitespace-nowrap border-b dark:border-gray-700 text-right text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                    成交額 <span className="text-[10px] ml-0.5">{getSortIcon(IND_IDX.BALANCE)}</span>
+                                    {t('col_turnover')} <span className="text-[10px] ml-0.5">{getSortIcon(IND_IDX.BALANCE)}</span>
                                 </th>
                             </tr>
                         </thead>
@@ -608,7 +743,7 @@
         // ----------------------------------------
         // 搜尋股票彈窗元件，支援跨市場模糊搜尋
         // ========================================
-        const SearchModal = ({ isOpen, onClose, allStocksData, onSelectStock, currentMarket }) => {
+        const SearchModal = ({ isOpen, onClose, allStocksData, onSelectStock, currentMarket, t }) => {
             const [query, setQuery] = useState('');
             const [results, setResults] = useState([]);
             const [selectedIndex, setSelectedIndex] = useState(0);
@@ -736,7 +871,7 @@
                     <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                         {/* 搜尋輸入 */}
                         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                            <label htmlFor="stock-search" className="sr-only">搜尋股票代碼或名稱</label>
+                            <label htmlFor="stock-search" className="sr-only">{t('msg_search_placeholder')}</label>
                             <SearchIcon aria-hidden="true" />
                             <input
                                 id="stock-search"
@@ -745,7 +880,7 @@
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder="搜尋股票代碼或名稱..."
+                                placeholder={t('msg_search_placeholder')}
                                 className="flex-1 bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400"
                                 autoComplete="off"
                             />
@@ -753,7 +888,7 @@
                                 <button
                                     onClick={() => setQuery('')}
                                     className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
-                                    aria-label="清除搜尋"
+                                    aria-label={t('tooltip_close')}
                                 >
                                     <CloseIcon aria-hidden="true" />
                                 </button>
@@ -813,15 +948,15 @@
                         {/* 無結果提示 */}
                         {query && results.length === 0 && (
                             <div className="px-4 py-8 text-center text-gray-500">
-                                找不到符合「{query}」的股票
+                                {t('msg_search_no_result').replace('{query}', query)}
                             </div>
                         )}
 
                         {/* 提示文字 */}
                         {!query && (
                             <div className="px-4 py-6 text-center text-gray-400 text-sm">
-                                輸入股票代碼或公司名稱開始搜尋<br />
-                                <span className="text-xs mt-1 block">支援 US 和 HK 市場</span>
+                                {t('msg_search_instruction')}<br />
+                                <span className="text-xs mt-1 block">{t('msg_search_support')}</span>
                             </div>
                         )}
                     </div>
@@ -835,7 +970,7 @@
         // 成交排行列表元件，使用虛擬滾動技術
         // 只渲染可視區域的元素，支援 2000+ 筆資料流暢滾動
         // ========================================
-        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible, highlightedStockCode, fontSizePercent = 100, headerHeight = 40 }) => {
+        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible, highlightedStockCode, t, fontSizePercent = 100, headerHeight = 40 }) => {
             // 虛擬滾動核心變數
             const ROW_HEIGHT_EXPANDED = 30; // 展開模式每列高度 (px) - 單行
             const ROW_HEIGHT_COLLAPSED = 44; // 收起模式每列高度 (px) - 雙行
@@ -980,7 +1115,7 @@
             if (!stocks || stocks.length === 0) {
                 return (
                     <div className="flex-1 flex items-center justify-center text-gray-500">
-                        <span>無數據</span>
+                        <span>{t('msg_no_data')}</span>
                     </div>
                 );
             }
@@ -1027,22 +1162,22 @@
                             <thead className="bg-gray-50 dark:bg-gray-900 text-xs text-gray-500 dark:text-gray-400 uppercase">
                                 <tr>
                                     {/* Sticky: 排名 */}
-                                    <th className="sticky left-0 z-30 bg-gray-50 dark:bg-gray-900 px-1 py-2 text-center border-b border-gray-200 dark:border-gray-800 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)]" style={{ width: '40px' }}>#</th>
+                                    <th className="sticky left-0 z-30 bg-gray-50 dark:bg-gray-900 px-1 py-2 text-center border-b border-gray-200 dark:border-gray-800 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)]" style={{ width: '40px' }}>{t('col_rank')}</th>
                                     {/* Sticky: 股票資訊 */}
                                     <th
                                         className="sticky z-30 bg-gray-50 dark:bg-gray-900 px-2 py-2 text-left border-b border-gray-200 dark:border-gray-800 shadow-[2px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[2px_0_0_0_rgba(255,255,255,0.05)] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-850 select-none transition-colors whitespace-nowrap"
                                         style={{ left: '40px' }}
                                         onClick={toggleStockExpanded}
                                     >
-                                        Stock {stockExpanded ? '«' : '»'}
+                                        {t('col_stock')} {stockExpanded ? '«' : '»'}
                                     </th>
                                     {/* 收起模式下顯示其他欄位 */}
                                     {!stockExpanded && (
                                         <>
-                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">Vol</th>
-                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">PE</th>
-                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">RS</th>
-                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">Industry</th>
+                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">{t('col_vol')}</th>
+                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">{t('col_pe')}</th>
+                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">{t('col_rs')}</th>
+                                            <th className="px-2 py-2 text-right border-b border-gray-200 dark:border-gray-800 whitespace-nowrap">{t('col_industry')}</th>
                                         </>
                                     )}
                                 </tr>
@@ -1209,7 +1344,7 @@
                             onClick={scrollToTop}
                             className="fixed right-4 w-12 h-12 rounded-full bg-gray-800/80 dark:bg-gray-200/80 text-white dark:text-gray-800 flex items-center justify-center shadow-lg hover:bg-gray-700/90 dark:hover:bg-gray-300/90 z-50"
                             style={{ bottom: barsVisible ? 144 : 24, transition: 'bottom 300ms ease-out' }}
-                            title="回到頂部"
+                            title={t('tooltip_top')}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -1229,6 +1364,12 @@
             // ========================================
 
             // State
+            // 讀取語言設定
+            const [language, setLanguage] = useState(() => {
+                const saved = localStorage.getItem('language');
+                return (saved && TRANSLATIONS[saved]) ? saved : 'zh-HK';
+            });
+
             // 讀取市場設定（預設：美股）
             const [market, setMarket] = useState(() => {
                 const saved = localStorage.getItem('market');
@@ -1286,6 +1427,7 @@
                 setMarket('US');            // 預設美股
                 setViewMode('turnover');    // 預設成交排行
                 setTimeRange(TIME_RANGES[0]); // 預設 1D
+                // Language is intentionally NOT reset to avoid frustrating users
             };
 
             // 讀取暗黑模式設定
@@ -1293,6 +1435,18 @@
                 const saved = localStorage.getItem('darkMode');
                 return saved !== null ? saved === 'true' : true;
             });
+
+            // Translation Helper
+            const t = useCallback((key) => {
+                return TRANSLATIONS[language][key] || key;
+            }, [language]);
+
+            // 儲存語言設定
+            useEffect(() => {
+                localStorage.setItem('language', language);
+                document.documentElement.lang = language;
+                document.title = TRANSLATIONS[language].title;
+            }, [language]);
 
             // 儲存暗黑模式設定
             useEffect(() => {
@@ -1411,7 +1565,7 @@
                 fetchData();
                 // Reset selection when market changes
                 setSelectedSector(null);
-            }, [market]);
+            }, [market, language]);
 
             // Scroll selected sector into view with offset for sticky header
             useEffect(() => {
@@ -1439,6 +1593,7 @@
                 setError(null);
 
                 const PROXIES = [
+                    '', // Direct connection first
                     'https://corsproxy.io/?',
                     'https://api.codetabs.com/v1/proxy?quest='
                 ];
@@ -1447,9 +1602,11 @@
 
                 for (const proxy of PROXIES) {
                     try {
-                        // Using CORS Proxy with cache-busting timestamp
-                        const targetUrl = MARKETS[market].url + '&_t=' + Date.now();
-                        const proxyUrl = proxy + encodeURIComponent(targetUrl);
+                        // Append locale and cache-busting timestamp
+                        const targetUrl = MARKETS[market].url + `&locale=${language}` + '&_t=' + Date.now();
+
+                        // If proxy is empty, use targetUrl directly. If proxy exists, encode targetUrl.
+                        const proxyUrl = proxy ? (proxy + encodeURIComponent(targetUrl)) : targetUrl;
 
                         const res = await fetch(proxyUrl, { cache: 'no-store' });
                         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -1482,14 +1639,15 @@
             // 初始載入時，預先載入另一個市場的資料供搜尋使用
             const fetchOtherMarketData = async (otherMarket) => {
                 const PROXIES = [
+                    '', // Direct connection first
                     'https://corsproxy.io/?',
                     'https://api.codetabs.com/v1/proxy?quest='
                 ];
 
                 for (const proxy of PROXIES) {
                     try {
-                        const targetUrl = MARKETS[otherMarket].url + '&_t=' + Date.now();
-                        const proxyUrl = proxy + encodeURIComponent(targetUrl);
+                        const targetUrl = MARKETS[otherMarket].url + `&locale=${language}` + '&_t=' + Date.now();
+                        const proxyUrl = proxy ? (proxy + encodeURIComponent(targetUrl)) : targetUrl;
 
                         const res = await fetch(proxyUrl, { cache: 'no-store' });
                         if (!res.ok) continue;
@@ -1527,10 +1685,8 @@
             // 初始化時預載另一個市場的資料
             useEffect(() => {
                 const otherMarket = market === 'US' ? 'HK' : 'US';
-                if (allStocksData[otherMarket].length === 0) {
-                    fetchOtherMarketData(otherMarket);
-                }
-            }, [market]);
+                fetchOtherMarketData(otherMarket);
+            }, [market, language]);
 
             // Process Data: Group and Calculate
             const processedSectors = useMemo(() => {
@@ -1688,15 +1844,15 @@
                     {error && (
                         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
                             <div className="bg-red-900/90 p-6 rounded-xl text-white max-w-md text-center border border-red-700">
-                                <h3 className="text-lg font-bold mb-2">發生錯誤</h3>
+                                <h3 className="text-lg font-bold mb-2">{t('msg_error')}</h3>
                                 <p className="mb-4">{error}</p>
                                 <button
                                     onClick={fetchData}
                                     className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg transition-colors"
                                 >
-                                    重試
+                                    {t('msg_retry')}
                                 </button>
-                                <p className="mt-4 text-xs text-gray-300">提示：請檢查您的網路連線或安裝 CORS 解除擴充功能。</p>
+                                <p className="mt-4 text-xs text-gray-300">{t('msg_error_hint')}</p>
                             </div>
                         </div>
                     )}
@@ -1704,11 +1860,11 @@
                     {/* 1. Header - 絕對定位，浮在內容上方，毛玉璃效果 */}
                     <header ref={headerRef} className="fixed top-0 left-0 right-0 z-50 px-4 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                         <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden sm:block">
-                            行業板塊
+                            {t('title')}
                         </h1>
                         {/* Mobile Title (Short) */}
                         <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent sm:hidden">
-                            板塊
+                            {t('title')}
                         </h1>
 
                         {/* Market Breadth Bar */}
@@ -1719,8 +1875,8 @@
                             <button
                                 onClick={() => setSearchOpen(true)}
                                 className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                title="搜尋股票"
-                                aria-label="搜尋股票"
+                                title={t('tooltip_search')}
+                                aria-label={t('tooltip_search')}
                             >
                                 <SearchIcon aria-hidden="true" />
                             </button>
@@ -1730,8 +1886,8 @@
                                 onClick={fetchData}
                                 disabled={loading}
                                 className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                title="重新整理"
-                                aria-label="重新整理"
+                                title={t('tooltip_refresh')}
+                                aria-label={t('tooltip_refresh')}
                             >
                                 <div className={loading ? "animate-spin" : ""} aria-hidden="true">
                                     <RefreshIcon />
@@ -1743,8 +1899,8 @@
                                 <button
                                     onClick={() => setSettingsOpen(!settingsOpen)}
                                     className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                    title="設定"
-                                    aria-label="設定"
+                                    title={t('tooltip_settings')}
+                                    aria-label={t('tooltip_settings')}
                                     aria-expanded={settingsOpen}
                                 >
                                     <SettingsIcon aria-hidden="true" />
@@ -1762,7 +1918,7 @@
                                         <div className="absolute top-full right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden" style={{ fontSize: '14px', width: '256px' }}>
                                             {/* 標題 */}
                                             <div style={{ padding: '12px 16px' }} className="border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                                                <span className="font-bold text-gray-800 dark:text-gray-200">設定</span>
+                                                <span className="font-bold text-gray-800 dark:text-gray-200">{t('settings_title')}</span>
                                                 <button
                                                     onClick={() => setSettingsOpen(false)}
                                                     className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -1772,30 +1928,47 @@
                                                 </button>
                                             </div>
 
+                                            {/* Language Settings */}
+                                            <div style={{ padding: '12px 16px' }} className="border-b border-gray-200 dark:border-gray-700">
+                                                <div style={{ fontSize: '12px', marginBottom: '8px' }} className="font-medium text-gray-600 dark:text-gray-400">{t('settings_language')}</div>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {Object.keys(TRANSLATIONS).map(lang => (
+                                                        <button
+                                                            key={lang}
+                                                            onClick={() => setLanguage(lang)}
+                                                            style={{ fontSize: '12px', padding: '6px 4px' }}
+                                                            className={`rounded-lg font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 truncate ${language === lang ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                                                        >
+                                                            {lang === 'zh-HK' ? '繁體' : lang === 'zh-CN' ? '简体' : 'EN'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
                                             {/* 明暗模式 */}
                                             <div style={{ padding: '12px 16px' }} className="border-b border-gray-200 dark:border-gray-700">
-                                                <div style={{ fontSize: '12px', marginBottom: '8px' }} className="font-medium text-gray-600 dark:text-gray-400">外觀模式</div>
+                                                <div style={{ fontSize: '12px', marginBottom: '8px' }} className="font-medium text-gray-600 dark:text-gray-400">{t('settings_theme')}</div>
                                                 <div className="flex" style={{ gap: '8px' }}>
                                                     <button
                                                         onClick={() => setDarkMode(false)}
                                                         style={{ fontSize: '12px', padding: '8px 12px' }}
                                                         className={`flex-1 rounded-lg font-medium transition-colors flex items-center justify-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${!darkMode ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
                                                     >
-                                                        <SunIcon aria-hidden="true" /> 明亮
+                                                        <SunIcon aria-hidden="true" /> {t('settings_theme_light')}
                                                     </button>
                                                     <button
                                                         onClick={() => setDarkMode(true)}
                                                         style={{ fontSize: '12px', padding: '8px 12px' }}
                                                         className={`flex-1 rounded-lg font-medium transition-colors flex items-center justify-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${darkMode ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
                                                     >
-                                                        <MoonIcon aria-hidden="true" /> 暗黑
+                                                        <MoonIcon aria-hidden="true" /> {t('settings_theme_dark')}
                                                     </button>
                                                 </div>
                                             </div>
 
                                             {/* 字型大小 */}
                                             <div style={{ padding: '12px 16px' }}>
-                                                <div style={{ fontSize: '12px', marginBottom: '8px' }} className="font-medium text-gray-600 dark:text-gray-400">字型大小</div>
+                                                <div style={{ fontSize: '12px', marginBottom: '8px' }} className="font-medium text-gray-600 dark:text-gray-400">{t('settings_fontsize')}</div>
                                                 <div className="flex items-center justify-center" style={{ gap: '12px' }}>
                                                     <button
                                                         onClick={decreaseFontSize}
@@ -1831,7 +2004,7 @@
                                                     style={{ fontSize: '13px', padding: '10px 16px', width: '100%' }}
                                                     className="rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium transition-colors active:scale-95 transform flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                                                 >
-                                                    <RefreshIcon aria-hidden="true" /> 重置所有設定
+                                                    <RefreshIcon aria-hidden="true" /> {t('settings_reset')}
                                                 </button>
                                             </div>
                                         </div>
@@ -1871,6 +2044,7 @@
                                         highlightedStockCode={highlightedStock}
                                         fontSizePercent={fontSizePercent}
                                         headerHeight={headerHeight}
+                                        t={t}
                                     />
                                 </div>
                                 {/* 下方：Split View - 板塊成分股 */}
@@ -1887,7 +2061,7 @@
                                             <button
                                                 onClick={() => setSplitViewSector(null)}
                                                 className="px-3 py-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-md transition-colors"
-                                                title="關閉"
+                                                title={t('tooltip_close')}
                                             >
                                                 <CloseIcon />
                                             </button>
@@ -1895,6 +2069,7 @@
                                         <StockTable
                                             stocks={processedSectors.find(s => s.name === splitViewSector)?.stocks || []}
                                             timeRangeIdx={timeRange.idx}
+                                            t={t}
                                         />
                                     </div>
                                 )}
@@ -1947,7 +2122,7 @@
                                                     </tr>
                                                 )) : (<tr>
                                                     <td colSpan={TIME_RANGES.length} className="text-center text-gray-400 py-8 text-sm">
-                                                        無數據
+                                                        {t('msg_no_data')}
                                                     </td>
                                                 </tr>
                                                 )}
@@ -1972,14 +2147,14 @@
                                                 <button
                                                     onClick={() => handleNavigate(-1)}
                                                     className="px-4 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md transition-colors"
-                                                    title="上一個板塊"
+                                                    title={t('tooltip_prev_sector')}
                                                 >
                                                     <NavArrowUp />
                                                 </button>
                                                 <button
                                                     onClick={() => handleNavigate(1)}
                                                     className="px-4 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md transition-colors"
-                                                    title="下一個板塊"
+                                                    title={t('tooltip_next_sector')}
                                                 >
                                                     <NavArrowDown />
                                                 </button>
@@ -1987,13 +2162,13 @@
                                                 <button
                                                     onClick={() => setSelectedSector(null)}
                                                     className="px-4 py-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-md transition-colors"
-                                                    title="關閉"
+                                                    title={t('tooltip_close')}
                                                 >
                                                     <CloseIcon />
                                                 </button>
                                             </div>
                                         </div>
-                                        <StockTable stocks={activeStocks} timeRangeIdx={timeRange.idx} />
+                                        <StockTable stocks={activeStocks} timeRangeIdx={timeRange.idx} t={t} />
                                     </div>
                                 )}
                             </>
@@ -2007,7 +2182,7 @@
                                     onClick={scrollToTop}
                                     className="fixed right-4 w-12 h-12 rounded-full bg-gray-800/80 dark:bg-gray-200/80 text-white dark:text-gray-800 flex items-center justify-center shadow-lg hover:bg-gray-700/90 dark:hover:bg-gray-300/90 z-50"
                                     style={{ bottom: barsVisible ? 144 : 24, transition: 'bottom 300ms ease-out' }}
-                                    title="回到頂部"
+                                    title={t('tooltip_top')}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -2054,7 +2229,7 @@
                                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}
                                 `}
                             >
-                                成交排行
+                                {t('view_turnover')}
                                 {viewMode === 'turnover' && (
                                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 mx-2 rounded-t-full"></div>
                                 )}
@@ -2068,7 +2243,7 @@
                                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}
                                 `}
                             >
-                                強勢排行
+                                {t('view_strong')}
                                 {viewMode === 'strong' && (
                                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 mx-2 rounded-t-full"></div>
                                 )}
@@ -2082,7 +2257,7 @@
                                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}
                                 `}
                             >
-                                弱勢排行
+                                {t('view_weak')}
                                 {viewMode === 'weak' && (
                                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500 mx-2 rounded-t-full"></div>
                                 )}
@@ -2103,7 +2278,7 @@
                                                 : 'bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}
                                     `}
                                     >
-                                        {m.label}
+                                        {t(m.labelKey)}
                                     </button>
                                 ))
                             }
@@ -2119,6 +2294,7 @@
                         allStocksData={allStocksData}
                         onSelectStock={handleSearchSelect}
                         currentMarket={market}
+                        t={t}
                     />
                 </div >
             );
