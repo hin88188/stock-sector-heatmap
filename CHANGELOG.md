@@ -2,6 +2,28 @@
 
 本文件記錄所有版本的更新內容。格式基於 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.0.0/)。
 
+## [v1.4.4] - 2026-02-02
+
+### 新增
+- ✨ 新增語言切換功能，支援繁體中文、簡體中文、英文：
+  - 在設定面板新增語言選擇區塊（位於外觀模式下方）
+  - 透過 `locale` URL 參數控制 API 回傳的股票名稱語言
+  - 預設語言為繁體中文 (zh-HK)
+  - 語言設定自動保存至 localStorage
+  - 切換語言後自動重新載入資料
+
+### 優化
+- ⚡ 簡化 CORS Proxy 設定，僅使用單一 proxy 服務
+- 🎨 語言選擇 UI 採用與外觀模式一致的按鈕群組設計
+
+### 技術實作
+- 🔧 新增 `LANGUAGES` 常數定義 (zh-HK, zh-CN, en)
+- 🔧 新增 `language` state 與 localStorage 持久化
+- 🔧 修改 `fetchData()` 與 `fetchOtherMarketData()` 加入 `locale` 參數
+- 🔧 新增語言切換時自動重新抓取資料的 useEffect
+
+---
+
 ## [v1.4.3] - 2026-01-27
 
 ### 新增

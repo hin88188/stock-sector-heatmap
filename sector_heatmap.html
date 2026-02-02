@@ -149,6 +149,14 @@
             }
         };
 
+        const LANGUAGES = {
+            'zh-HK': { code: 'zh-HK', label: '繁', name: '繁體中文' },
+            'zh-CN': { code: 'zh-CN', label: '簡', name: '简体中文' },
+            'en': { code: 'en', label: 'Eng', name: 'English' }
+        };
+
+        const DEFAULT_LANGUAGE = 'zh-HK';
+
         const TIME_RANGES = [
             { label: '1D', key: '1', idx: 1 },
             { label: '5D', key: '12', idx: 12 },
@@ -1268,6 +1276,12 @@
                 return saved && !isNaN(parsed) && parsed >= 50 && parsed <= 200 ? parsed : 100;
             });
 
+            // 讀取語言設定（預設：繁體中文 zh-HK）
+            const [language, setLanguage] = useState(() => {
+                const saved = localStorage.getItem('language');
+                return saved && LANGUAGES[saved] ? saved : DEFAULT_LANGUAGE;
+            });
+
             // 儲存字型大小到 localStorage
             useEffect(() => {
                 localStorage.setItem('fontSizePercent', fontSizePercent.toString());
@@ -1362,6 +1376,11 @@
                 document.documentElement.classList.toggle('dark', darkMode);
             }, [darkMode]);
 
+            // 語言設定持久化
+            useEffect(() => {
+                localStorage.setItem('language', language);
+            }, [language]);
+
             // 滾動方向偵測 - 控制標題欄與導航欄的隱藏/顯示
             const handleMainScroll = useCallback((e) => {
                 const currentScrollY = e.target.scrollTop;
@@ -1413,6 +1432,16 @@
                 setSelectedSector(null);
             }, [market]);
 
+            // 語言改變時重新抓取資料
+            useEffect(() => {
+                fetchData();
+                // 同時重新抓取另一市場資料（如果已載入過）
+                const otherMarket = market === 'US' ? 'HK' : 'US';
+                if (allStocksData[otherMarket].length > 0) {
+                    fetchOtherMarketData(otherMarket);
+                }
+            }, [language]);
+
             // Scroll selected sector into view with offset for sticky header
             useEffect(() => {
                 if (selectedSector && sectorRefs.current[selectedSector] && scrollContainerRef.current) {
@@ -1438,70 +1467,57 @@
                 setLoading(true);
                 setError(null);
 
-                const PROXIES = [
-                    'https://corsproxy.io/?',
-                    'https://api.codetabs.com/v1/proxy?quest='
-                ];
+                // 簡化為只用 codetabs proxy
+                const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
 
-                let lastError = null;
+                try {
+                    // Using CORS Proxy with cache-busting timestamp
+                    const targetUrl = MARKETS[market].url + '&_t=' + Date.now() + '&locale=' + language;
+                    const proxyUrl = PROXY + encodeURIComponent(targetUrl);
 
-                for (const proxy of PROXIES) {
-                    try {
-                        // Using CORS Proxy with cache-busting timestamp
-                        const targetUrl = MARKETS[market].url + '&_t=' + Date.now();
-                        const proxyUrl = proxy + encodeURIComponent(targetUrl);
+                    const res = await fetch(proxyUrl, {
+                        cache: 'no-store'
+                    });
+                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
-                        const res = await fetch(proxyUrl, { cache: 'no-store' });
-                        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    const json = await res.json();
 
-                        const json = await res.json();
-
-                        // Handle nested data structure: response.data.list
-                        if (json.data && Array.isArray(json.data.list)) {
-                            setRawData(json.data.list);
-                            // 同時更新 allStocksData 供搜尋使用
-                            setAllStocksData(prev => ({ ...prev, [market]: json.data.list }));
-                            setLoading(false); // Success
-                            return; // Exit function on success
-                        } else {
-                            throw new Error('Invalid API response structure');
-                        }
-                    } catch (err) {
-                        console.warn(`Proxy ${proxy} failed:`, err);
-                        lastError = err;
-                        // Continue to next proxy
+                    // Handle nested data structure: response.data.list
+                    if (json.data && Array.isArray(json.data.list)) {
+                        setRawData(json.data.list);
+                        // 同時更新 allStocksData 供搜尋使用
+                        setAllStocksData(prev => ({ ...prev, [market]: json.data.list }));
+                        setLoading(false); // Success
+                        return; // Exit function on success
+                    } else {
+                        throw new Error('Invalid API response structure');
                     }
+                } catch (err) {
+                    console.error("Fetch failed:", err);
+                    setError(err ? err.message : "Failed to fetch data");
+                    setLoading(false);
                 }
-
-                // All proxies failed
-                console.error("All proxies failed:", lastError);
-                setError(lastError ? lastError.message : "Failed to fetch data");
-                setLoading(false);
             };
 
             // 初始載入時，預先載入另一個市場的資料供搜尋使用
             const fetchOtherMarketData = async (otherMarket) => {
-                const PROXIES = [
-                    'https://corsproxy.io/?',
-                    'https://api.codetabs.com/v1/proxy?quest='
-                ];
+                const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
 
-                for (const proxy of PROXIES) {
-                    try {
-                        const targetUrl = MARKETS[otherMarket].url + '&_t=' + Date.now();
-                        const proxyUrl = proxy + encodeURIComponent(targetUrl);
+                try {
+                    const targetUrl = MARKETS[otherMarket].url + '&_t=' + Date.now() + '&locale=' + language;
+                    const proxyUrl = PROXY + encodeURIComponent(targetUrl);
 
-                        const res = await fetch(proxyUrl, { cache: 'no-store' });
-                        if (!res.ok) continue;
+                    const res = await fetch(proxyUrl, {
+                        cache: 'no-store'
+                    });
+                    if (!res.ok) return;
 
-                        const json = await res.json();
-                        if (json.data && Array.isArray(json.data.list)) {
-                            setAllStocksData(prev => ({ ...prev, [otherMarket]: json.data.list }));
-                            return;
-                        }
-                    } catch (err) {
-                        console.warn(`Prefetch ${otherMarket} failed:`, err);
+                    const json = await res.json();
+                    if (json.data && Array.isArray(json.data.list)) {
+                        setAllStocksData(prev => ({ ...prev, [otherMarket]: json.data.list }));
                     }
+                } catch (err) {
+                    console.warn(`Prefetch ${otherMarket} failed:`, err);
                 }
             };
 
@@ -1790,6 +1806,29 @@
                                                     >
                                                         <MoonIcon aria-hidden="true" /> 暗黑
                                                     </button>
+                                                </div>
+                                            </div>
+
+                                            {/* 語言設定 */}
+                                            <div style={{ padding: '12px 16px' }} className="border-b border-gray-200 dark:border-gray-700">
+                                                <div style={{ fontSize: '12px', marginBottom: '8px' }} className="font-medium text-gray-600 dark:text-gray-400">API 語言</div>
+                                                <div className="flex" style={{ gap: '8px' }}>
+                                                    {Object.values(LANGUAGES).map((lang) => (
+                                                        <button
+                                                            key={lang.code}
+                                                            onClick={() => {
+                                                                setLanguage(lang.code);
+                                                                setSettingsOpen(false);
+                                                            }}
+                                                            style={{ fontSize: '12px', padding: '8px 12px' }}
+                                                            className={`flex-1 rounded-lg font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${language === lang.code
+                                                                ? 'bg-blue-500 text-white'
+                                                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                                                }`}
+                                                        >
+                                                            {lang.label}
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             </div>
 
