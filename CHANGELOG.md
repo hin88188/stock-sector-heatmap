@@ -2,6 +2,47 @@
 
 本文件記錄所有版本的更新內容。格式基於 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.0.0/)。
 
+## [v1.5.0] - 2026-02-03
+
+### 新增
+- ✨ 新增股票詳情視窗 (StockDetailModal)：
+  - 點擊成交排行中的任意股票列即可開啟詳情視窗
+  - 顯示股票名稱、代號、當前價格與漲跌幅
+  - 支援 ESC 鍵或點擊背景關閉視窗
+- ✨ 新增互動式走勢圖 (StockChart)：
+  - 使用 TradingView lightweight-charts 4.2 Baseline Series
+  - 支援 1D / 5D / 1M / 3M / 6M / 1Y 六個時間範圍切換
+  - 綠色區域表示高於基準價，紅色區域表示低於基準價
+  - 支援滑鼠滾輪縮放與拖曳平移
+- ✨ 新增浮動提示框 (Floating Tooltip)：
+  - 滑鼠移動時 tooltip 浮動於數據點上方
+  - 顯示股票名稱、價格、漲跌幅（基於 baseline）、時間
+  - 自動適應深色/淺色模式
+- ✨ 新增時間範圍切換器 (TimeRangeSwitcher)：
+  - 響應式 Grid 佈局：小螢幕 3×2、大螢幕 6×1
+  - 每個按鈕顯示時間範圍與該期間漲跌幅
+  - 當前選中範圍以藍色背景標示
+
+### 優化
+- 🌐 圖表時區與瀏覽器一致：
+  - X 軸刻度使用 `tickMarkFormatter` 搭配 `toLocaleTimeString()`
+  - Crosshair 標籤使用 `localization.timeFormatter`
+  - Tooltip 時間使用瀏覽器本地時區格式化
+- 📊 改進 baseline 計算邏輯（參考官方 MiniTimesharesSparklineWidget）：
+  - 1D：baseline = 昨收價 (pre_close)
+  - 5D：baseline = 第一個交易日的昨收價
+  - 1M/3M/6M/1Y：baseline = 第一筆 K 線收盤價
+
+### 技術實作
+- 🔧 新增 `parseChartData()` 函數，返回 `{ points, baseline }` 結構
+- 🔧 新增 `StockChart` 元件，支援 `data`、`baseline`、`stockName` props
+- 🔧 新增 `TimeRangeSwitcher` 元件，支援響應式 Grid 佈局
+- 🔧 新增 `StockDetailModal` 元件，整合走勢圖與時間切換
+- 🔧 新增 `CHART_APIS` 常數定義各時間範圍的 API 端點
+- 🔧 使用 `line_type=1000` 作為日 K 線參數（修正原先錯誤的 `line_type=1`）
+
+---
+
 ## [v1.4.4] - 2026-02-02
 
 ### 新增

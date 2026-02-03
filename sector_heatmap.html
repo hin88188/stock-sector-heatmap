@@ -10,6 +10,8 @@
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -188,6 +190,83 @@
         };
 
         // --- Utilities ---
+
+        // 解析圖表數據 - 返回 { points, baseline }
+        // 參考 MiniTimesharesSparklineWidget.js 的 normalizeData 邏輯
+        const parseChartData = (data, timeRange) => {
+            try {
+                if (!data) return { points: [], baseline: null };
+                
+                // 1D: timeshares[0].minutes[] 有 timestamp, price
+                // baseline = pre_close（昨收價）
+                if (timeRange === '1D') {
+                    const ts = data?.timeshares?.find(t => String(t.trade_session) === '0')
+                            || data?.timeshares?.[0];
+                    if (!ts?.minutes?.length) return { points: [], baseline: null };
+                    
+                    const baseline = parseFloat(ts.pre_close ?? data.base_price);
+                    const points = ts.minutes.map((m, i) => ({
+                        time: parseInt(m.timestamp, 10),
+                        value: parseFloat(m.price)
+                    })).filter(d => !isNaN(d.time) && !isNaN(d.value));
+                    
+                    return { points, baseline };
+                }
+                
+                // 5D: timeshares[].minutes[] 有 timestamp, price
+                // baseline = 第一個交易日的 pre_close
+                if (timeRange === '5D') {
+                    const sessions = (data?.timeshares || [])
+                        .filter(s => s?.minutes?.length > 0)
+                        .sort((a, b) => (a.date || 0) - (b.date || 0))
+                        .slice(-5);
+                    
+                    if (!sessions.length) return { points: [], baseline: null };
+                    
+                    const baseline = parseFloat(sessions[0].pre_close ?? data.base_price);
+                    const points = [];
+                    
+                    sessions.forEach(day => {
+                        if (Array.isArray(day?.minutes)) {
+                            day.minutes.forEach(m => {
+                                const time = parseInt(m.timestamp, 10);
+                                const value = parseFloat(m.price);
+                                if (!isNaN(time) && !isNaN(value)) {
+                                    points.push({ time, value });
+                                }
+                            });
+                        }
+                    });
+                    
+                    return { points, baseline };
+                }
+                
+                // 1M/3M/6M/1Y: klines[] 有 timestamp, close
+                // baseline = 第一筆 close，從第二筆開始繪製
+                const klines = data?.klines;
+                if (!Array.isArray(klines) || klines.length < 2) {
+                    return { points: [], baseline: null };
+                }
+                
+                const baseline = parseFloat(klines[0].close);
+                const points = [];
+                
+                // 從第二筆開始（第一筆是基準）
+                for (let i = 1; i < klines.length; i++) {
+                    const k = klines[i];
+                    const time = parseInt(k.timestamp, 10);
+                    const value = parseFloat(k.close);
+                    if (!isNaN(time) && !isNaN(value)) {
+                        points.push({ time, value });
+                    }
+                }
+                
+                return { points, baseline };
+            } catch (e) {
+                console.error('parseChartData error:', e);
+                return { points: [], baseline: null };
+            }
+        };
 
         const formatPercent = (raw) => {
             const num = parseFloat(raw);
@@ -843,7 +922,7 @@
         // 成交排行列表元件，使用虛擬滾動技術
         // 只渲染可視區域的元素，支援 2000+ 筆資料流暢滾動
         // ========================================
-        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onScroll, barsVisible, highlightedStockCode, fontSizePercent = 100, headerHeight = 40 }) => {
+        const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onStockClick, onScroll, barsVisible, highlightedStockCode, fontSizePercent = 100, headerHeight = 40 }) => {
             // 虛擬滾動核心變數
             const ROW_HEIGHT_EXPANDED = 30; // 展開模式每列高度 (px) - 單行
             const ROW_HEIGHT_COLLAPSED = 44; // 收起模式每列高度 (px) - 雙行
@@ -1094,7 +1173,8 @@
                                         return (
                                             <tr
                                                 key={stock.code || realIndex}
-                                                className={`hover:bg-gray-50 dark:hover:bg-gray-850 active:bg-gray-100 dark:active:bg-gray-900 transition-colors ${isHighlighted
+                                                onClick={() => onStockClick && onStockClick(stock)}
+                                                className={`hover:bg-gray-50 dark:hover:bg-gray-850 active:bg-gray-100 dark:active:bg-gray-900 transition-colors cursor-pointer ${isHighlighted
                                                     ? 'bg-yellow-100 dark:bg-yellow-900/30 ring-2 ring-yellow-400 dark:ring-yellow-500'
                                                     : 'bg-white dark:bg-gray-950'
                                                     }`}
@@ -1197,7 +1277,7 @@
                                                                 change={sectorAvgChanges[industry]}
                                                                 count={sectorData[industry]?.stockCount}
                                                                 maxVal={globalMaxVal}
-                                                                onClick={() => onMiniSectorClick && onMiniSectorClick(industry)}
+                                                                onClick={(e) => { e.stopPropagation(); onMiniSectorClick && onMiniSectorClick(industry); }}
                                                             />
                                                         </td>
                                                     </>
@@ -1224,6 +1304,462 @@
                             </svg>
                         </button>
                     )}
+                </div>
+            );
+        };
+
+
+        // ========================================
+        // StockChart - 股票走勢圖組件 (Baseline Series)
+        // 使用 lightweight-charts 4.2 API
+        // ========================================
+        const StockChart = ({ data, baseline, loading, stockName }) => {
+            const chartContainerRef = useRef(null);
+            const chartRef = useRef(null);
+            const seriesRef = useRef(null);
+            const resizeObserverRef = useRef(null);
+            const tooltipRef = useRef(null);
+
+            // Tooltip 顯示狀態
+            const [tooltipData, setTooltipData] = useState(null);
+
+            // 格式化時間（根據瀏覽器時區）
+            const formatTooltipTime = (timestamp) => {
+                const date = new Date(timestamp * 1000);
+                const options = {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                };
+                return date.toLocaleString(undefined, options);
+            };
+
+            // 初始化圖表
+            useEffect(() => {
+                if (!chartContainerRef.current) return;
+
+                // 創建圖表 (只執行一次)
+                const chart = window.LightweightCharts.createChart(chartContainerRef.current, {
+                    layout: { 
+                        background: { type: 'solid', color: 'transparent' }, 
+                        textColor: '#9CA3AF' 
+                    },
+                    grid: { 
+                        vertLines: { visible: false }, 
+                        horzLines: { color: 'rgba(42, 46, 57, 0.15)' } 
+                    },
+                    rightPriceScale: { borderVisible: false },
+                    timeScale: { 
+                        borderVisible: false, 
+                        timeVisible: true,
+                        secondsVisible: false,
+                        // X 軸刻度格式化（使用瀏覽器時區）
+                        tickMarkFormatter: (timestamp, tickMarkType, locale) => {
+                            const date = new Date(timestamp * 1000);
+                            // tickMarkType: 0=Year, 1=Month, 2=DayOfMonth, 3=Time, 4=TimeWithSeconds
+                            if (tickMarkType <= 2) {
+                                // 日期格式
+                                return date.toLocaleDateString(undefined, { 
+                                    month: 'short', 
+                                    day: 'numeric' 
+                                });
+                            }
+                            // 時間格式
+                            return date.toLocaleTimeString(undefined, { 
+                                hour: '2-digit', 
+                                minute: '2-digit',
+                                hour12: false 
+                            });
+                        },
+                    },
+                    localization: {
+                        // Crosshair label 和 tooltip 時間格式化
+                        timeFormatter: (timestamp) => {
+                            const date = new Date(timestamp * 1000);
+                            return date.toLocaleTimeString(undefined, { 
+                                hour: '2-digit', 
+                                minute: '2-digit',
+                                hour12: false 
+                            });
+                        },
+                    },
+                    crosshair: { 
+                        vertLine: { labelVisible: false },
+                        horzLine: { labelVisible: true },
+                    },
+                    handleScroll: { mouseWheel: true, pressedMouseMove: true },
+                    handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+                });
+                chartRef.current = chart;
+
+                // 創建 Baseline Series (4.2 語法: addBaselineSeries)
+                const series = chart.addBaselineSeries({
+                    baseValue: { type: 'price', price: 0 },
+                    topLineColor: '#06A870',
+                    topFillColor1: 'rgba(6, 168, 112, 0.28)',
+                    topFillColor2: 'rgba(6, 168, 112, 0.05)',
+                    bottomLineColor: '#F03A55',
+                    bottomFillColor1: 'rgba(240, 58, 85, 0.05)',
+                    bottomFillColor2: 'rgba(240, 58, 85, 0.28)',
+                    lineWidth: 2,
+                    priceLineVisible: false,
+                    lastValueVisible: true,
+                });
+                seriesRef.current = series;
+
+                // ResizeObserver 處理容器大小變化
+                resizeObserverRef.current = new ResizeObserver(entries => {
+                    if (entries.length > 0 && chartRef.current) {
+                        const { width, height } = entries[0].contentRect;
+                        if (width > 0 && height > 0) {
+                            chartRef.current.applyOptions({ width, height });
+                        }
+                    }
+                });
+                resizeObserverRef.current.observe(chartContainerRef.current);
+
+                // Floating Tooltip: 訂閱 crosshairMove 事件
+                const container = chartContainerRef.current;
+                const toolTipWidth = 120;
+                const toolTipHeight = 70;
+                const toolTipMargin = 15;
+
+                chart.subscribeCrosshairMove(param => {
+                    if (
+                        param.point === undefined ||
+                        !param.time ||
+                        param.point.x < 0 ||
+                        param.point.x > container.clientWidth ||
+                        param.point.y < 0 ||
+                        param.point.y > container.clientHeight
+                    ) {
+                        setTooltipData(null);
+                    } else {
+                        const seriesData = param.seriesData.get(series);
+                        if (!seriesData) {
+                            setTooltipData(null);
+                            return;
+                        }
+                        const price = seriesData.value !== undefined ? seriesData.value : seriesData.close;
+                        const coordinate = series.priceToCoordinate(price);
+                        if (coordinate === null) {
+                            setTooltipData(null);
+                            return;
+                        }
+
+                        // 計算 tooltip 位置（浮動在數據點旁邊）
+                        let shiftedX = param.point.x - toolTipWidth / 2;
+                        shiftedX = Math.max(0, Math.min(container.clientWidth - toolTipWidth, shiftedX));
+                        
+                        let coordinateY = coordinate - toolTipHeight - toolTipMargin > 0
+                            ? coordinate - toolTipHeight - toolTipMargin
+                            : Math.max(0, Math.min(
+                                container.clientHeight - toolTipHeight - toolTipMargin,
+                                coordinate + toolTipMargin
+                            ));
+
+                        setTooltipData({
+                            x: shiftedX,
+                            y: coordinateY,
+                            price: price,
+                            time: param.time,
+                        });
+                    }
+                });
+
+                return () => {
+                    resizeObserverRef.current?.disconnect();
+                    chart.remove();
+                    chartRef.current = null;
+                    seriesRef.current = null;
+                };
+            }, []);
+
+            // 更新數據
+            useEffect(() => {
+                if (!seriesRef.current || !chartRef.current) return;
+                
+                if (data && data.length > 0) {
+                    // 使用傳入的 baseline，若無則用第一個數據點
+                    const basePrice = baseline ?? data[0].value;
+                    seriesRef.current.applyOptions({ 
+                        baseValue: { type: 'price', price: basePrice } 
+                    });
+                    seriesRef.current.setData(data);
+                    chartRef.current.timeScale().fitContent();
+                } else {
+                    // 清空數據
+                    seriesRef.current.setData([]);
+                }
+            }, [data, baseline]);
+
+            // 計算漲跌幅（基於 baseline）
+            const getChangeInfo = (price) => {
+                if (baseline == null || price == null) return { change: 0, isPositive: false };
+                const change = (price - baseline) / baseline;
+                return { change, isPositive: change >= 0 };
+            };
+
+            return (
+                <div className="relative w-full h-64 min-h-[256px]">
+                    {loading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-900/80 z-10 rounded-lg">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                    )}
+                    {!loading && (!data || data.length === 0) && (
+                        <div className="absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-500">
+                            <div className="text-center">
+                                <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                <p className="text-sm">暫無數據</p>
+                            </div>
+                        </div>
+                    )}
+                    <div ref={chartContainerRef} className="w-full h-full" />
+                    
+                    {/* Floating Tooltip */}
+                    {tooltipData && (
+                        <div
+                            ref={tooltipRef}
+                            className="absolute pointer-events-none z-20 px-3 py-2 rounded-lg shadow-lg border text-xs
+                                       bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600"
+                            style={{
+                                left: tooltipData.x,
+                                top: tooltipData.y,
+                                minWidth: 100,
+                            }}
+                        >
+                            {stockName && (
+                                <div className="font-medium text-blue-600 dark:text-blue-400 mb-1 truncate">{stockName}</div>
+                            )}
+                            <div className="font-bold text-lg text-gray-900 dark:text-white">
+                                {tooltipData.price?.toFixed(2)}
+                            </div>
+                            {(() => {
+                                const { change, isPositive } = getChangeInfo(tooltipData.price);
+                                return (
+                                    <div className={`text-xs font-medium ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                                        {formatPercent(change)}
+                                    </div>
+                                );
+                            })()}
+                            <div className="text-gray-500 dark:text-gray-400 mt-1">
+                                {formatTooltipTime(tooltipData.time)}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+
+        // ========================================
+        // TimeRangeSwitcher - 時間範圍切換器
+        // ========================================
+        const TimeRangeSwitcher = ({ selectedRange, onRangeChange, rangeData }) => {
+            const ranges = ['1D', '5D', '1M', '3M', '6M', '1Y'];
+            
+            return (
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-2">
+                    {ranges.map(range => {
+                        const isActive = selectedRange === range;
+                        const changePercent = rangeData?.[range]?.change;
+                        const isPositive = changePercent > 0;
+                        const isNegative = changePercent < 0;
+                        
+                        return (
+                            <button
+                                key={range}
+                                onClick={() => onRangeChange(range)}
+                                className={`py-1.5 px-2 rounded-lg text-center transition-colors
+                                    ${isActive 
+                                        ? 'bg-blue-600' 
+                                        : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                    }`}
+                            >
+                                <div className={`text-xs font-medium ${isActive ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                                    {range}
+                                </div>
+                                <div className={`text-xs font-bold ${
+                                    isPositive ? 'text-emerald-500' : 
+                                    isNegative ? 'text-red-500' : 
+                                    (isActive ? 'text-white/70' : 'text-gray-400')
+                                }`}>
+                                    {changePercent != null ? formatPercent(changePercent) : '-'}
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+
+        // ========================================
+        // StockDetailModal - 股票詳情模態框
+        // ========================================
+        const CHART_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
+        const CHART_APIS = {
+            // 1D: 分時數據
+            '1D': (id) => `https://m-gl.lbkrs.com/api/forward/v5/quote/stock/timeshares?counter_id=${id}&trade_session=0`,
+            // 5D: 多日分時
+            '5D': (id) => `https://m-gl.lbkrs.com/api/forward/quote/stock/mutitimeshares?counter_id=${id}&merge_minute=0`,
+            // 1M/3M/6M/1Y: K線 (line_type=1000 是日K)
+            '1M': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=24&line_type=1000`,
+            '3M': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=65&line_type=1000`,
+            '6M': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=130&line_type=1000`,
+            '1Y': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=260&line_type=1000`,
+        };
+
+        const StockDetailModal = ({ stock, onClose }) => {
+            const [selectedRange, setSelectedRange] = useState('1D');
+            const [chartData, setChartData] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [rangeData, setRangeData] = useState({});
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                if (stock) {
+                    setSelectedRange('1D');
+                    setChartData([]);
+                    setLoading(true);
+                    setRangeData({});
+                    setError(null);
+                }
+            }, [stock]);
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (e.key === 'Escape') onClose();
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [onClose]);
+
+            useEffect(() => {
+                if (!stock) return;
+
+                const controller = new AbortController();
+                const ranges = ['1D', '5D', '1M', '3M', '6M', '1Y'];
+
+                const fetchRangeData = async (range) => {
+                    if (controller.signal.aborted) return;
+                    
+                    try {
+                        const apiUrl = CHART_APIS[range](stock.counter_id);
+                        const url = CHART_PROXY + encodeURIComponent(apiUrl);
+                        console.log(`[Chart] Fetching ${range} for ${stock.counter_id}:`, apiUrl);
+                        
+                        const res = await fetch(url, { signal: controller.signal });
+                        if (!res.ok) {
+                            console.error(`[Chart] ${range} HTTP error:`, res.status);
+                            setError(`HTTP ${res.status}`);
+                            return;
+                        }
+                        
+                        const json = await res.json();
+                        console.log(`[Chart] ${range} raw response:`, json);
+                        
+                        const { points, baseline } = parseChartData(json.data, range);
+                        console.log(`[Chart] ${range} parsed: ${points.length} points, baseline=${baseline}`);
+
+                        // 計算漲跌幅：使用 baseline 作為基準
+                        let change = 0;
+                        if (points.length > 0 && baseline != null) {
+                            const lastPrice = points[points.length - 1].value;
+                            change = (lastPrice - baseline) / baseline;
+                        }
+
+                        setRangeData(prev => ({ ...prev, [range]: { data: points, baseline, change } }));
+
+                        if (range === selectedRange && !controller.signal.aborted) {
+                            setChartData(points);
+                            setLoading(false);
+                        }
+                    } catch (e) {
+                        if (e.name !== 'AbortError') {
+                            console.error(`[Chart] Failed to fetch ${range}:`, e);
+                            setError(e.message);
+                        }
+                    }
+                };
+
+                // Fetch all ranges with staggered timing
+                ranges.forEach((range, index) => {
+                    setTimeout(() => {
+                        if (!controller.signal.aborted) fetchRangeData(range);
+                    }, index * 150);
+                });
+
+                // Timeout fallback: if no data after 5s, stop loading
+                const timeoutId = setTimeout(() => {
+                    setLoading(false);
+                }, 5000);
+
+                return () => {
+                    controller.abort();
+                    clearTimeout(timeoutId);
+                };
+            }, [stock]);
+
+            useEffect(() => {
+                if (rangeData[selectedRange]) {
+                    setChartData(rangeData[selectedRange].data);
+                    setLoading(false);
+                } else {
+                    setLoading(true);
+                }
+            }, [selectedRange, rangeData]);
+
+            // 取得當前 range 的 baseline
+            const currentBaseline = rangeData[selectedRange]?.baseline ?? null;
+
+            if (!stock) return null;
+
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                    onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+                    
+                    <div className="relative w-full max-w-[80vw] max-h-[80vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-3">
+                                <img src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`} 
+                                    className="w-10 h-10 rounded-full" 
+                                    onError={(e) => e.target.style.display = 'none'} />
+                                <div>
+                                    <div className="font-bold text-lg dark:text-white">{stock.name}</div>
+                                    <div className="text-sm text-gray-500">{stock.code || stock.symbol}</div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                    <div className="font-bold text-xl dark:text-white">
+                                        {formatNumber(stock.indicators[0])}
+                                    </div>
+                                    <div className={`text-sm font-medium ${stock.indicators[1] >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                        {formatPercent(stock.indicators[1])}
+                                    </div>
+                                </div>
+                                <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                                    <svg className="w-5 h-5 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="flex-1 p-4 overflow-y-auto">
+                            <TimeRangeSwitcher selectedRange={selectedRange} onRangeChange={setSelectedRange} rangeData={rangeData} />
+                            <div className="mt-4">
+                                <StockChart data={chartData} baseline={currentBaseline} loading={loading} stockName={stock.name} />
+                            </div>
+                        </div>
+                    </div>
                 </div>
             );
         };
@@ -1265,6 +1801,11 @@
             const [searchOpen, setSearchOpen] = useState(false);
             const [highlightedStock, setHighlightedStock] = useState(null);
             const [allStocksData, setAllStocksData] = useState({ US: [], HK: [] }); // 跨市場搜尋用
+
+            // 股票詳情 Modal 狀態
+            const [selectedStock, setSelectedStock] = useState(null);
+            const handleStockClick = (stock) => setSelectedStock(stock);
+            const handleCloseStockModal = () => setSelectedStock(null);
 
             // 設定相關狀態
             const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1905,6 +2446,7 @@
                                         globalMaxVal={globalMaxVal}
                                         timeRangeIdx={timeRange.idx}
                                         onMiniSectorClick={handleSplitViewSectorClick}
+                                        onStockClick={handleStockClick}
                                         onScroll={handleMainScroll}
                                         barsVisible={barsVisible}
                                         highlightedStockCode={highlightedStock}
@@ -2159,6 +2701,9 @@
                         onSelectStock={handleSearchSelect}
                         currentMarket={market}
                     />
+
+                    {/* Stock Detail Modal */}
+                    <StockDetailModal stock={selectedStock} onClose={handleCloseStockModal} />
                 </div >
             );
         };
