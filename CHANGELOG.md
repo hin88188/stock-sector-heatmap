@@ -2,6 +2,19 @@
 
 本文件記錄所有版本的更新內容。格式基於 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.0.0/)。
 
+## [v1.5.1] - 2026-02-03
+
+### 修復
+- 🐛 修復股票走勢圖 X 軸可被左右拖曳移動的問題：
+  - 禁用 `handleScroll` 與 `handleScale` 防止用戶拖曳或縮放圖表
+- 🐛 修復窄螢幕下 5D 等長時間範圍數據無法完整顯示的問題：
+  - 設定 `minBarSpacing: 0.001` 允許極高數據密度
+  - 設定 `fixLeftEdge: true` 與 `fixRightEdge: true` 固定顯示範圍邊界
+  - 使用 `setVisibleRange()` 取代 `fitContent()` 強制顯示完整時間範圍
+  - 新增 `dataRef` 供 ResizeObserver 在視窗調整時重新設定可視範圍
+
+---
+
 ## [v1.5.0] - 2026-02-03
 
 ### 新增

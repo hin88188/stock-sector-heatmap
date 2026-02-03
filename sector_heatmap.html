@@ -1319,6 +1319,7 @@
             const seriesRef = useRef(null);
             const resizeObserverRef = useRef(null);
             const tooltipRef = useRef(null);
+            const dataRef = useRef(null); // 保存 data 引用供 ResizeObserver 使用
 
             // Tooltip 顯示狀態
             const [tooltipData, setTooltipData] = useState(null);
@@ -1355,6 +1356,10 @@
                         borderVisible: false, 
                         timeVisible: true,
                         secondsVisible: false,
+                        // 強制顯示完整數據範圍（無論螢幕多窄）
+                        minBarSpacing: 0.001,
+                        fixLeftEdge: true,
+                        fixRightEdge: true,
                         // X 軸刻度格式化（使用瀏覽器時區）
                         tickMarkFormatter: (timestamp, tickMarkType, locale) => {
                             const date = new Date(timestamp * 1000);
@@ -1389,8 +1394,8 @@
                         vertLine: { labelVisible: false },
                         horzLine: { labelVisible: true },
                     },
-                    handleScroll: { mouseWheel: true, pressedMouseMove: true },
-                    handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+                    handleScroll: false,
+                    handleScale: false,
                 });
                 chartRef.current = chart;
 
@@ -1415,6 +1420,14 @@
                         const { width, height } = entries[0].contentRect;
                         if (width > 0 && height > 0) {
                             chartRef.current.applyOptions({ width, height });
+                            // 調整大小後使用 setVisibleRange 確保數據完整顯示
+                            const currentData = dataRef.current;
+                            if (currentData && currentData.length > 0) {
+                                chartRef.current.timeScale().setVisibleRange({
+                                    from: currentData[0].time,
+                                    to: currentData[currentData.length - 1].time,
+                                });
+                            }
                         }
                     }
                 });
@@ -1481,6 +1494,9 @@
             useEffect(() => {
                 if (!seriesRef.current || !chartRef.current) return;
                 
+                // 更新 dataRef 供 ResizeObserver 使用
+                dataRef.current = data;
+                
                 if (data && data.length > 0) {
                     // 使用傳入的 baseline，若無則用第一個數據點
                     const basePrice = baseline ?? data[0].value;
@@ -1488,7 +1504,11 @@
                         baseValue: { type: 'price', price: basePrice } 
                     });
                     seriesRef.current.setData(data);
-                    chartRef.current.timeScale().fitContent();
+                    // 使用 setVisibleRange 強制顯示完整時間範圍
+                    chartRef.current.timeScale().setVisibleRange({
+                        from: data[0].time,
+                        to: data[data.length - 1].time,
+                    });
                 } else {
                     // 清空數據
                     seriesRef.current.setData([]);
