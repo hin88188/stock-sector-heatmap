@@ -1635,12 +1635,13 @@
             '1Y': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=260&line_type=1000`,
         };
 
-        const StockDetailModal = ({ stock, onClose }) => {
+        const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, processedSectors, globalMaxVal, timeRangeIdx }) => {
             const [selectedRange, setSelectedRange] = useState('1D');
             const [chartData, setChartData] = useState([]);
             const [loading, setLoading] = useState(true);
             const [rangeData, setRangeData] = useState({});
             const [error, setError] = useState(null);
+            const [showSectorStocks, setShowSectorStocks] = useState(false); // 行業成分股展開狀態
 
             useEffect(() => {
                 if (stock) {
@@ -1649,6 +1650,7 @@
                     setLoading(true);
                     setRangeData({});
                     setError(null);
+                    setShowSectorStocks(false); // 重置行業成分股展開狀態
                 }
             }, [stock]);
 
@@ -1738,6 +1740,18 @@
             // 取得當前 range 的 baseline
             const currentBaseline = rangeData[selectedRange]?.baseline ?? null;
 
+            // 取得股票所屬行業
+            const industry = stock?.indicators?.[IND_IDX.INDUSTRY];
+            const industryChange = sectorAvgChanges?.[industry] || 0;
+            const industryData = sectorData?.[industry];
+            
+            // 取得行業成分股
+            const sectorStocks = useMemo(() => {
+                if (!industry || !processedSectors) return [];
+                const sector = processedSectors.find(s => s.name === industry);
+                return sector ? sector.stocks : [];
+            }, [industry, processedSectors]);
+
             if (!stock) return null;
 
             return (
@@ -1746,38 +1760,61 @@
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
                     
                     <div className="relative w-full max-w-[80vw] max-h-[80vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
-                        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center gap-3">
-                                <img src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`} 
-                                    className="w-10 h-10 rounded-full" 
-                                    onError={(e) => e.target.style.display = 'none'} />
-                                <div>
-                                    <div className="font-bold text-lg dark:text-white">{stock.name}</div>
-                                    <div className="text-sm text-gray-500">{stock.code || stock.symbol}</div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="text-right">
-                                    <div className="font-bold text-xl dark:text-white">
-                                        {formatNumber(stock.indicators[0])}
-                                    </div>
-                                    <div className={`text-sm font-medium ${stock.indicators[1] >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                        {formatPercent(stock.indicators[1])}
+                        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <img src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`} 
+                                        className="w-10 h-10 rounded-full" 
+                                        onError={(e) => e.target.style.display = 'none'} />
+                                    <div>
+                                        <div className="font-bold text-lg dark:text-white">{stock.name}</div>
+                                        <div className="text-sm text-gray-500">{stock.code || stock.symbol}</div>
                                     </div>
                                 </div>
-                                <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
-                                    <svg className="w-5 h-5 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right">
+                                        <div className="font-bold text-xl dark:text-white">
+                                            {formatNumber(stock.indicators[0])}
+                                        </div>
+                                        <div className={`text-sm font-medium ${stock.indicators[1] >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                            {formatPercent(stock.indicators[1])}
+                                        </div>
+                                    </div>
+                                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                                        <svg className="w-5 h-5 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
+
+                            {/* Industry SectorCard - 行業方塊 */}
+                            {industry && industry !== '-' && (
+                                <div className="mt-3">
+                                    <SectorCard
+                                        name={industry}
+                                        count={industryData?.stockCount || sectorStocks.length}
+                                        change={industryChange}
+                                        maxVal={globalMaxVal || 0.1}
+                                        onClick={() => setShowSectorStocks(prev => !prev)}
+                                        isSelected={showSectorStocks}
+                                    />
+                                </div>
+                            )}
                         </div>
                         
+                        {/* 行業成分股明細 - 可展開/收合 */}
+                        {showSectorStocks && sectorStocks.length > 0 && (
+                            <div className="border-t border-gray-200 dark:border-gray-700 max-h-[40vh] overflow-y-auto">
+                                <StockTable stocks={sectorStocks} timeRangeIdx={timeRangeIdx || IND_IDX.CHG_1D} />
+                            </div>
+                        )}
+                        
                         <div className="flex-1 p-4 overflow-y-auto">
-                            <TimeRangeSwitcher selectedRange={selectedRange} onRangeChange={setSelectedRange} rangeData={rangeData} />
-                            <div className="mt-4">
+                            <div className="mb-4">
                                 <StockChart data={chartData} baseline={currentBaseline} loading={loading} stockName={stock.name} />
                             </div>
+                            <TimeRangeSwitcher selectedRange={selectedRange} onRangeChange={setSelectedRange} rangeData={rangeData} />
                         </div>
                     </div>
                 </div>
@@ -2723,7 +2760,15 @@
                     />
 
                     {/* Stock Detail Modal */}
-                    <StockDetailModal stock={selectedStock} onClose={handleCloseStockModal} />
+                    <StockDetailModal 
+                        stock={selectedStock} 
+                        onClose={handleCloseStockModal}
+                        sectorData={sectorData}
+                        sectorAvgChanges={sectorAvgChanges}
+                        processedSectors={processedSectors}
+                        globalMaxVal={globalMaxVal}
+                        timeRangeIdx={timeRange.idx}
+                    />
                 </div >
             );
         };
