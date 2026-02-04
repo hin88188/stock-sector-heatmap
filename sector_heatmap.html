@@ -282,15 +282,24 @@
             return num.toFixed(2);
         }
 
-        const formatLargeNumber = (raw) => {
-            const num = parseFloat(raw);
-            if (isNaN(num)) return '-';
-            const abs = Math.abs(num);
-            if (abs >= 1.0e12) return (num / 1.0e12).toFixed(2) + 'T';
-            if (abs >= 1.0e9) return (num / 1.0e9).toFixed(2) + 'B';
-            if (abs >= 1.0e6) return (num / 1.0e6).toFixed(2) + 'M';
-            if (abs >= 1.0e3) return (num / 1.0e3).toFixed(2) + 'K';
+        const formatLargeNumber = (num) => {
+            if (num == null || isNaN(num)) return '-';
+            const absNum = Math.abs(num);
+            if (absNum >= 1e12) return (num / 1e12).toFixed(2) + ' 萬億';
+            if (absNum >= 1e8) return (num / 1e8).toFixed(2) + ' 億';
+            if (absNum >= 1e4) return (num / 1e4).toFixed(2) + ' 萬';
             return num.toFixed(2);
+        };
+
+        const formatCode = (counterId) => {
+            if (!counterId) return '-';
+            const parts = counterId.split('/');
+            if (parts.length === 3) {
+                // 港股保持原始代碼格式 (如 00100.HK, 01810.HK)
+                // 美股直接使用代碼 (如 NVDA.US)
+                return `${parts[2]}.${parts[1]}`;
+            }
+            return counterId;
         };
 
         const getColorClass = (val) => {
@@ -298,6 +307,70 @@
             if (val > 0) return 'text-quote-up';
             if (val < 0) return 'text-quote-down';
             return 'text-quote-neutral';
+        };
+
+        // 解析股票詳情數據
+        const parseDetailData = (data) => {
+            if (!data) return null;
+            
+            const raw = data;
+            const lastDone = parseFloat(raw.last_done);
+            const prevClose = parseFloat(raw.prev_close);
+            
+            // 基礎資料映射
+            const baseData = {
+                ...raw,
+                last_done: lastDone,
+                prev_close: prevClose,
+                open: parseFloat(raw.open),
+                high: parseFloat(raw.high),
+                low: parseFloat(raw.low),
+                amount: parseFloat(raw.amount),
+                balance: parseFloat(raw.balance),
+                volume_rate: parseFloat(raw.volume_rate),
+                year_high: parseFloat(raw.year_high),
+                year_low: parseFloat(raw.year_low),
+                total_shares: parseFloat(raw.total_shares),
+                circulating_shares: parseFloat(raw.circulating_shares),
+                bps: parseFloat(raw.bps),
+                eps: parseFloat(raw.eps),
+                eps_ttm: parseFloat(raw.eps_ttm),
+                eps_forecast: parseFloat(raw.eps_forecast),
+                dividend_yield: parseFloat(raw.dividend_yield),
+                dps_rate: parseFloat(raw.dps_rate),
+                unit: parseInt(raw.unit, 10),
+            };
+
+            return calculateDerivedFields(baseData);
+        };
+
+        // 計算衍生欄位
+        const calculateDerivedFields = (data) => {
+            const { last_done, prev_close, total_shares, circulating_shares, amount, high, low, eps_ttm, eps_forecast, eps, bps } = data;
+            
+            const change = last_done - prev_close;
+            const changePercent = (prev_close > 0) ? (change / prev_close) * 100 : 0;
+            const marketCap = last_done * total_shares;
+            const turnoverRate = (circulating_shares > 0) ? (amount / circulating_shares) * 100 : 0;
+            const amplitude = (prev_close > 0) ? ((high - low) / prev_close) * 100 : 0;
+            
+            const peTtm = (eps_ttm && eps_ttm > 0) ? last_done / eps_ttm : null;
+            const peDynamic = (eps_forecast && eps_forecast > 0) ? last_done / eps_forecast : null;
+            const peStatic = (eps && eps > 0) ? last_done / eps : null;
+            const pbRatio = (bps && bps > 0) ? last_done / bps : null;
+
+            return {
+                ...data,
+                change,
+                changePercent,
+                marketCap,
+                turnoverRate,
+                amplitude,
+                peTtm,
+                peDynamic,
+                peStatic,
+                pbRatio
+            };
         };
 
         const getBgColorClass = (val) => {
@@ -474,7 +547,7 @@
             );
         }));
 
-        const StockTable = ({ stocks, timeRangeIdx }) => {
+        const StockTable = ({ stocks, timeRangeIdx, className = '' }) => {
             const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
             // Reset sort when sector changes (stocks prop changes)
@@ -484,7 +557,7 @@
 
             if (!stocks || stocks.length === 0) {
                 return (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                    <div className={`flex flex-col items-center justify-center h-full text-gray-400 ${className}`}>
                         <p>請選擇上方板塊以查看詳情</p>
                     </div>
                 );
@@ -517,14 +590,12 @@
                         if (sortConfig.key === 'symbol') {
                             valA = a.symbol || a.code;
                             valB = b.symbol || b.code;
-                            // String comparison
                             if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
                             if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
                             return 0;
                         } else if (sortConfig.key === 'name') {
                             valA = a.name;
                             valB = b.name;
-                            // String comparison
                             if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
                             if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
                             return 0;
@@ -547,7 +618,7 @@
             }, [stocks, timeRangeIdx, sortConfig]);
 
             return (
-                <div className="overflow-auto relative overscroll-none pb-6">
+                <div className={`overflow-auto relative overscroll-none pb-6 ${className}`}>
                     <table className="w-full text-sm text-left border-collapse">
                         <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400 sticky top-0 z-20 shadow-sm cursor-pointer select-none">
                             <tr>
@@ -1620,6 +1691,143 @@
 
 
         // ========================================
+        // DetailTabHeader - 詳情頁分頁標籤
+        // ========================================
+        const DetailTabHeader = ({ tabs, activeTab, onTabClick }) => {
+            return (
+                <div className="flex items-center gap-6 border-b border-gray-200 dark:border-gray-700 px-4">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => {
+                                onTabClick(tab.id);
+                                if (tab.ref?.current) {
+                                    tab.ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                            }}
+                            className={`
+                                relative pb-3 text-sm font-bold transition-all
+                                ${activeTab === tab.id
+                                    ? 'text-gray-900 dark:text-white'
+                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}
+                            `}
+                        >
+                            {tab.label}
+                            {activeTab === tab.id && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-t-full" />
+                            )}
+                        </button>
+                    ))}
+                </div>
+            );
+        };
+
+        const StockInfoGrid = ({ data, loading }) => {
+            // 根據 counter_id 判斷市場
+            const market = data?.counter_id?.includes('/HK/') ? 'HK' : 'US';
+            const currencyLabel = market === 'HK' ? 'HKD' : 'USD';
+            
+            const DETAIL_FIELDS = [
+                { key: 'stock_name', label: '名稱' },
+                { key: 'counter_id', label: '代碼', format: 'code' },
+                { key: 'industry_name', label: '行業' },
+                { key: 'last_done', label: '現價' },
+                { key: 'change', label: '漲跌額' },
+                { key: 'changePercent', label: '漲跌幅', format: 'percent' },
+                { key: 'open', label: '今開', compareWithPrevClose: true },
+                { key: 'prev_close', label: '昨收' },
+                { key: 'high', label: '最高', compareWithPrevClose: true },
+                { key: 'low', label: '最低', compareWithPrevClose: true },
+                { key: 'balance', label: '成交額', format: 'largeNumber' },
+                { key: 'amount', label: '成交量', format: 'largeNumber', suffix: '股' },
+                { key: 'turnoverRate', label: '換手率', format: 'percentNoSign' },
+                { key: 'amplitude', label: '振幅', format: 'percentNoSign' },
+                { key: 'year_high', label: '52周高' },
+                { key: 'year_low', label: '52周低' },
+                { key: 'peTtm', label: '市盈率', superscript: 'TTM' },
+                { key: 'peDynamic', label: '市盈率', superscript: '動' },
+                { key: 'peStatic', label: '市盈率', superscript: '靜' },
+                { key: 'pbRatio', label: '市淨率' },
+                { key: 'volume_rate', label: '量比' },
+                { key: 'marketCap', label: '總市值', format: 'largeNumber', superscript: currencyLabel },
+                { key: 'total_shares', label: '總股本', format: 'largeNumber', suffix: '股' },
+                { key: 'circulating_shares', label: '流通股本', format: 'largeNumber', suffix: '股' },
+                { key: 'bps', label: '每股淨資產' },
+                { key: 'eps', label: '每股收益', superscript: '靜' },
+                { key: 'eps_ttm', label: '每股收益', superscript: 'TTM' },
+                { key: 'eps_forecast', label: '每股收益', superscript: '動' },
+                { key: 'dividend_yield', label: '股息', superscript: 'TTM' },
+                { key: 'dps_rate', label: '股息率', superscript: 'TTM', format: 'percent' },
+                { key: 'unit', label: '每手' },
+            ];
+
+            if (loading) {
+                return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-8 gap-y-0 p-4">
+                        {Array.from({ length: 31 }).map((_, i) => (
+                            <div key={i} className="flex justify-between items-center py-2">
+                                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                                <div className="h-4 w-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                            </div>
+                        ))}
+                    </div>
+                );
+            }
+
+            const renderValue = (field) => {
+                const val = data?.[field.key];
+                if (val === null || val === undefined || (typeof val === 'number' && isNaN(val)) || val === '') return '-';
+
+                if (field.format === 'code') return formatCode(val);
+                if (field.format === 'largeNumber') {
+                    let res = formatLargeNumber(val);
+                    if (field.suffix && res !== '-') res += field.suffix;
+                    return res;
+                }
+                if (field.key === 'change') {
+                    const num = parseFloat(val);
+                    if (isNaN(num)) return '-';
+                    const sign = num > 0 ? '+' : '';
+                    return `${sign}${num.toFixed(2)}`; // 2小數位，可根據需要調整
+                }
+
+                if (field.format === 'percent') {
+                    return formatPercent(parseFloat(val) / 100);
+                }
+                if (field.format === 'percentNoSign') {
+                    // 振幅、換手率等不需要正負號的百分比
+                    const num = parseFloat(val);
+                    if (isNaN(num)) return '-';
+                    return `${num.toFixed(2)}%`;
+                }
+                if (typeof val === 'number') return formatNumber(val);
+                return val;
+            };
+
+            return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-8 gap-y-0 p-4">
+                    {DETAIL_FIELDS.map((field) => (
+                        <div key={field.key} className="flex justify-between items-center py-2">
+                            <span className="text-gray-500 dark:text-gray-400 text-sm">
+                                {field.label}
+                                {field.superscript && <sup className="text-xs text-gray-400 ml-0.5">{field.superscript}</sup>}
+                            </span>
+                            <span className={`text-sm font-medium ${
+                                (field.key === 'change' || field.key === 'changePercent')
+                                    ? getColorClass(data?.[field.key])
+                                    : field.compareWithPrevClose
+                                        ? getColorClass(data?.[field.key] - data?.prev_close)
+                                        : 'text-gray-900 dark:text-white'
+                            }`}>
+                                {renderValue(field)}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        // ========================================
         // StockDetailModal - 股票詳情模態框
         // ========================================
         const CHART_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
@@ -1634,20 +1842,29 @@
             '6M': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=130&line_type=1000`,
             '1Y': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=260&line_type=1000`,
         };
+        const DETAIL_API = (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/stock/detail?counter_id=${id}`;
 
-        const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, processedSectors, globalMaxVal, timeRangeIdx }) => {
+        const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, processedSectors, globalMaxVal, timeRangeIdx, language }) => {
             const [selectedRange, setSelectedRange] = useState('1D');
             const [chartData, setChartData] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [detailData, setDetailData] = useState(null);
+            const [detailLoading, setDetailLoading] = useState(true);
             const [rangeData, setRangeData] = useState({});
             const [error, setError] = useState(null);
             const [showSectorStocks, setShowSectorStocks] = useState(false); // 行業成分股展開狀態
+            const [activeTab, setActiveTab] = useState('chart'); // 當前選中的 Tab
+            const chartRef = useRef(null); // 圖表區塊 ref
+            const infoRef = useRef(null); // 資訊區塊 ref
+            const contentRef = useRef(null); // 滾動容器 ref
 
             useEffect(() => {
                 if (stock) {
                     setSelectedRange('1D');
                     setChartData([]);
                     setLoading(true);
+                    setDetailData(null);
+                    setDetailLoading(true);
                     setRangeData({});
                     setError(null);
                     setShowSectorStocks(false); // 重置行業成分股展開狀態
@@ -1667,6 +1884,34 @@
 
                 const controller = new AbortController();
                 const ranges = ['1D', '5D', '1M', '3M', '6M', '1Y'];
+
+                const fetchDetailData = async () => {
+                    if (controller.signal.aborted) return;
+                    setDetailLoading(true);
+                    
+                    try {
+                        const apiUrl = DETAIL_API(stock.counter_id) + `&locale=${language}`;
+                        const url = CHART_PROXY + encodeURIComponent(apiUrl);
+                        console.log(`[Detail] Fetching for ${stock.counter_id}:`, apiUrl);
+                        
+                        const res = await fetch(url, { signal: controller.signal });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        
+                        const json = await res.json();
+                        console.log(`[Detail] Response:`, json);
+                        
+                        const parsed = parseDetailData(json.data);
+                        setDetailData(parsed);
+                    } catch (e) {
+                        if (e.name !== 'AbortError') {
+                            console.error(`[Detail] Failed to fetch detail:`, e);
+                        }
+                    } finally {
+                        if (!controller.signal.aborted) {
+                            setDetailLoading(false);
+                        }
+                    }
+                };
 
                 const fetchRangeData = async (range) => {
                     if (controller.signal.aborted) return;
@@ -1710,6 +1955,9 @@
                     }
                 };
 
+                // Fetch detail
+                fetchDetailData();
+
                 // Fetch all ranges with staggered timing
                 ranges.forEach((range, index) => {
                     setTimeout(() => {
@@ -1726,7 +1974,7 @@
                     controller.abort();
                     clearTimeout(timeoutId);
                 };
-            }, [stock]);
+            }, [stock, language]);
 
             useEffect(() => {
                 if (rangeData[selectedRange]) {
@@ -1739,6 +1987,40 @@
 
             // 取得當前 range 的 baseline
             const currentBaseline = rangeData[selectedRange]?.baseline ?? null;
+
+            // IntersectionObserver - 監聽區塊可見性以同步 Tab 狀態
+            useEffect(() => {
+                if (!contentRef.current) return;
+
+                const observer = new IntersectionObserver(
+                    (entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting && entry.intersectionRatio >= 0.3) {
+                                if (entry.target.id === 'section-chart') {
+                                    setActiveTab('chart');
+                                } else if (entry.target.id === 'section-info') {
+                                    setActiveTab('info');
+                                }
+                            }
+                        });
+                    },
+                    {
+                        root: contentRef.current,
+                        threshold: [0.3]
+                    }
+                );
+
+                if (chartRef.current) observer.observe(chartRef.current);
+                if (infoRef.current) observer.observe(infoRef.current);
+
+                return () => observer.disconnect();
+            }, [stock]);
+
+            // Tab 定義
+            const tabs = [
+                { id: 'chart', label: '圖表', ref: chartRef },
+                { id: 'info', label: '資訊', ref: infoRef }
+            ];
 
             // 取得股票所屬行業
             const industry = stock?.indicators?.[IND_IDX.INDUSTRY];
@@ -1753,6 +2035,14 @@
             }, [industry, processedSectors]);
 
             if (!stock) return null;
+
+            // Header Data
+            const price = stock.indicators[0];
+            const changePercent = stock.indicators[1];
+            const changeAmount = stock.indicators[2];
+            const isUp = changePercent >= 0;
+            const colorClass = isUp ? 'text-emerald-500' : 'text-red-500';
+            const sign = changeAmount > 0 ? '+' : '';
 
             return (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
@@ -1772,12 +2062,14 @@
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                        <div className="font-bold text-xl dark:text-white">
-                                            {formatNumber(stock.indicators[0])}
+                                    <div className={`text-right flex flex-col items-end ${colorClass}`}>
+                                        <div className="font-bold text-xl flex items-center gap-1 leading-none">
+                                            {formatNumber(price)}
+                                            <span className="text-lg">{isUp ? '↑' : '↓'}</span>
                                         </div>
-                                        <div className={`text-sm font-medium ${stock.indicators[1] >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                            {formatPercent(stock.indicators[1])}
+                                        <div className="text-sm font-medium flex items-center gap-1 mt-0.5">
+                                            <span>{sign}{formatNumber(changeAmount)}</span>
+                                            <span>({formatPercent(changePercent)})</span>
                                         </div>
                                     </div>
                                     <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
@@ -1803,18 +2095,36 @@
                             )}
                         </div>
                         
-                        {/* 行業成分股明細 - 可展開/收合 */}
-                        {showSectorStocks && sectorStocks.length > 0 && (
-                            <div className="border-t border-gray-200 dark:border-gray-700 max-h-[40vh] overflow-y-auto">
-                                <StockTable stocks={sectorStocks} timeRangeIdx={timeRangeIdx || IND_IDX.CHG_1D} />
+                        <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
+                            {/* Tab Header - 分頁標籤 */}
+                            <DetailTabHeader tabs={tabs} activeTab={activeTab} onTabClick={setActiveTab} />
+
+                            {/* 內容區（滾動容器） */}
+                            <div className="flex-1 overflow-y-auto" ref={contentRef}>
+                                {/* 圖表區塊 */}
+                                <div ref={chartRef} id="section-chart" className="p-4">
+                                    <div className="mb-4">
+                                        <StockChart data={chartData} baseline={currentBaseline} loading={loading} stockName={stock.name} />
+                                    </div>
+                                    <TimeRangeSwitcher selectedRange={selectedRange} onRangeChange={setSelectedRange} rangeData={rangeData} />
+                                </div>
+
+                                {/* 資訊區塊 */}
+                                <div ref={infoRef} id="section-info" className="mt-4">
+                                    <StockInfoGrid data={detailData} loading={detailLoading} />
+                                </div>
                             </div>
-                        )}
-                        
-                        <div className="flex-1 p-4 overflow-y-auto">
-                            <div className="mb-4">
-                                <StockChart data={chartData} baseline={currentBaseline} loading={loading} stockName={stock.name} />
-                            </div>
-                            <TimeRangeSwitcher selectedRange={selectedRange} onRangeChange={setSelectedRange} rangeData={rangeData} />
+
+                            {/* 行業成分股明細 - 覆蓋層 (Overlay) */}
+                            {showSectorStocks && sectorStocks.length > 0 && (
+                                <div className="absolute inset-0 z-20 bg-white dark:bg-gray-900 flex flex-col border-t border-gray-200 dark:border-gray-700">
+                                    <StockTable 
+                                        stocks={sectorStocks} 
+                                        timeRangeIdx={timeRangeIdx || IND_IDX.CHG_1D} 
+                                        className="h-full"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -2768,6 +3078,7 @@
                         processedSectors={processedSectors}
                         globalMaxVal={globalMaxVal}
                         timeRangeIdx={timeRange.idx}
+                        language={language}
                     />
                 </div >
             );
