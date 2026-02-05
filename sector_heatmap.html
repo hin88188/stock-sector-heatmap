@@ -17,6 +17,9 @@
             darkMode: 'class',
             theme: {
                 extend: {
+                    screens: {
+                        'landscape': { 'raw': '(orientation: landscape)' },
+                    },
                     colors: {
                         gray: {
                             750: '#2d3748',
@@ -451,7 +454,7 @@
                         <div className="flex items-center gap-2 flex-1">
                             <Skeleton className="w-8 h-8 rounded" />
                             <div className="flex-1 space-y-1">
-                                <Skeleton className="w-24 h-4" />
+                                <Skeleton className="w-26 h-4" />
                                 <Skeleton className="w-16 h-3" />
                             </div>
                         </div>
@@ -466,7 +469,7 @@
             <div className="flex-1 p-4 space-y-2">
                 {/* 表頭骨架 */}
                 <div className="flex items-center gap-4 pb-2 border-b border-gray-200 dark:border-gray-800">
-                    <Skeleton className="w-24 h-4" />
+                    <Skeleton className="w-26 h-4" />
                     <Skeleton className="w-16 h-4" />
                     <Skeleton className="w-16 h-4" />
                     <Skeleton className="w-16 h-4" />
@@ -1390,7 +1393,6 @@
             const seriesRef = useRef(null);
             const resizeObserverRef = useRef(null);
             const tooltipRef = useRef(null);
-            const dataRef = useRef(null); // 保存 data 引用供 ResizeObserver 使用
 
             // Tooltip 顯示狀態
             const [tooltipData, setTooltipData] = useState(null);
@@ -1490,15 +1492,9 @@
                     if (entries.length > 0 && chartRef.current) {
                         const { width, height } = entries[0].contentRect;
                         if (width > 0 && height > 0) {
-                            chartRef.current.applyOptions({ width, height });
-                            // 調整大小後使用 setVisibleRange 確保數據完整顯示
-                            const currentData = dataRef.current;
-                            if (currentData && currentData.length > 0) {
-                                chartRef.current.timeScale().setVisibleRange({
-                                    from: currentData[0].time,
-                                    to: currentData[currentData.length - 1].time,
-                                });
-                            }
+                            chartRef.current.resize(width, height);
+                            // 調整大小後適配內容
+                            chartRef.current.timeScale().fitContent();
                         }
                     }
                 });
@@ -1565,9 +1561,6 @@
             useEffect(() => {
                 if (!seriesRef.current || !chartRef.current) return;
                 
-                // 更新 dataRef 供 ResizeObserver 使用
-                dataRef.current = data;
-                
                 if (data && data.length > 0) {
                     // 使用傳入的 baseline，若無則用第一個數據點
                     const basePrice = baseline ?? data[0].value;
@@ -1575,11 +1568,8 @@
                         baseValue: { type: 'price', price: basePrice } 
                     });
                     seriesRef.current.setData(data);
-                    // 使用 setVisibleRange 強制顯示完整時間範圍
-                    chartRef.current.timeScale().setVisibleRange({
-                        from: data[0].time,
-                        to: data[data.length - 1].time,
-                    });
+                    // 使用 fitContent 強制顯示完整時間範圍
+                    chartRef.current.timeScale().fitContent();
                 } else {
                     // 清空數據
                     seriesRef.current.setData([]);
@@ -1594,7 +1584,7 @@
             };
 
             return (
-                <div className="relative w-full h-64 min-h-[256px]">
+                <div className="relative w-full h-64 min-h-[256px] landscape:h-full landscape:min-h-0">
                     {loading && (
                         <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-900/80 z-10 rounded-lg">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -1651,11 +1641,11 @@
         // ========================================
         // TimeRangeSwitcher - 時間範圍切換器
         // ========================================
-        const TimeRangeSwitcher = ({ selectedRange, onRangeChange, rangeData }) => {
+        const TimeRangeSwitcher = ({ selectedRange, onRangeChange, rangeData, className }) => {
             const ranges = ['1D', '5D', '1M', '3M', '6M', '1Y'];
             
             return (
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-2">
+                <div className={className || "grid grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-2"}>
                     {ranges.map(range => {
                         const isActive = selectedRange === range;
                         const changePercent = rangeData?.[range]?.change;
@@ -1666,7 +1656,7 @@
                             <button
                                 key={range}
                                 onClick={() => onRangeChange(range)}
-                                className={`py-1.5 px-2 rounded-lg text-center transition-colors
+                                className={`w-full min-w-0 whitespace-normal break-words py-1.5 px-2 rounded-lg text-center transition-colors leading-tight
                                     ${isActive 
                                         ? 'bg-blue-600' 
                                         : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -1722,7 +1712,7 @@
             );
         };
 
-        const StockInfoGrid = ({ data, loading }) => {
+        const StockInfoGrid = ({ data, loading, className }) => {
             // 根據 counter_id 判斷市場
             const market = data?.counter_id?.includes('/HK/') ? 'HK' : 'US';
             const currencyLabel = market === 'HK' ? 'HKD' : 'USD';
@@ -1761,9 +1751,11 @@
                 { key: 'unit', label: '每手' },
             ];
 
+            const gridClass = className || "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-8 gap-y-0 p-4";
+
             if (loading) {
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-8 gap-y-0 p-4">
+                    <div className={gridClass}>
                         {Array.from({ length: 31 }).map((_, i) => (
                             <div key={i} className="flex justify-between items-center py-2">
                                 <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
@@ -1805,7 +1797,7 @@
             };
 
             return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-8 gap-y-0 p-4">
+                <div className={gridClass}>
                     {DETAIL_FIELDS.map((field) => (
                         <div key={field.key} className="flex justify-between items-center py-2">
                             <span className="text-gray-500 dark:text-gray-400 text-sm">
@@ -2049,7 +2041,7 @@
                     onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
                     
-                    <div className="relative w-full max-w-[80vw] max-h-[80vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+                    <div className="relative w-full max-w-[80vw] max-h-[80vh] landscape:w-full landscape:h-full landscape:max-w-none landscape:max-h-none landscape:rounded-none landscape:m-0 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -2095,22 +2087,46 @@
                             )}
                         </div>
                         
-                        <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
-                            {/* Tab Header - 分頁標籤 */}
-                            <DetailTabHeader tabs={tabs} activeTab={activeTab} onTabClick={setActiveTab} />
+                        <div className="relative flex-1 flex flex-col landscape:flex-row min-h-0 overflow-hidden">
+                            {/* Tab Header - Portrait Only */}
+                            <div className="landscape:hidden">
+                                <DetailTabHeader tabs={tabs} activeTab={activeTab} onTabClick={setActiveTab} />
+                            </div>
 
-                            {/* 內容區（滾動容器） */}
-                            <div className="flex-1 overflow-y-auto" ref={contentRef}>
-                                {/* 圖表區塊 */}
-                                <div ref={chartRef} id="section-chart" className="p-4">
-                                    <div className="mb-4">
+                            {/* Left Column: Info Grid - Landscape Only */}
+                            <div className="hidden landscape:block w-[35%] h-full overflow-y-auto border-r border-gray-200 dark:border-gray-700 scroll-container">
+                                <StockInfoGrid 
+                                    data={detailData} 
+                                    loading={detailLoading} 
+                                    className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-0 p-4"
+                                />
+                            </div>
+
+                            {/* Right Column / Main Content */}
+                            <div className="flex-1 overflow-y-auto landscape:w-[65%] landscape:h-full landscape:overflow-hidden landscape:flex landscape:flex-row" ref={contentRef}>
+                                {/* 圖表區塊 (Chart Block) */}
+                                <div ref={chartRef} id="section-chart" className="p-4 landscape:p-0 landscape:flex-1 landscape:min-w-0 landscape:flex landscape:flex-col landscape:h-full landscape:relative">
+                                    <div className="mb-4 landscape:mb-0 landscape:flex-1 landscape:relative landscape:h-full">
                                         <StockChart data={chartData} baseline={currentBaseline} loading={loading} stockName={stock.name} />
                                     </div>
-                                    <TimeRangeSwitcher selectedRange={selectedRange} onRangeChange={setSelectedRange} rangeData={rangeData} />
+                                    {/* Portrait Switcher */}
+                                    <div className="landscape:hidden">
+                                        <TimeRangeSwitcher selectedRange={selectedRange} onRangeChange={setSelectedRange} rangeData={rangeData} />
+                                    </div>
                                 </div>
 
-                                {/* 資訊區塊 */}
-                                <div ref={infoRef} id="section-info" className="mt-4">
+                                {/* Landscape Switcher (Right side) */}
+                                <div className="hidden landscape:flex flex-col border-l border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/20 w-26 min-w-[6.5rem]">
+                                    <TimeRangeSwitcher 
+                                        selectedRange={selectedRange} 
+                                        onRangeChange={setSelectedRange} 
+                                        rangeData={rangeData}
+                                        className="flex flex-col gap-2 p-2 h-full overflow-y-auto no-scrollbar overscroll-y-contain"
+                                    />
+                                </div>
+
+                                {/* 資訊區塊 - Portrait Only */}
+                                <div ref={infoRef} id="section-info" className="mt-4 landscape:hidden">
                                     <StockInfoGrid data={detailData} loading={detailLoading} />
                                 </div>
                             </div>
