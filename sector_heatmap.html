@@ -199,23 +199,23 @@
         const parseChartData = (data, timeRange) => {
             try {
                 if (!data) return { points: [], baseline: null };
-                
+
                 // 1D: timeshares[0].minutes[] 有 timestamp, price
                 // baseline = pre_close（昨收價）
                 if (timeRange === '1D') {
                     const ts = data?.timeshares?.find(t => String(t.trade_session) === '0')
-                            || data?.timeshares?.[0];
+                        || data?.timeshares?.[0];
                     if (!ts?.minutes?.length) return { points: [], baseline: null };
-                    
+
                     const baseline = parseFloat(ts.pre_close ?? data.base_price);
                     const points = ts.minutes.map((m, i) => ({
                         time: parseInt(m.timestamp, 10),
                         value: parseFloat(m.price)
                     })).filter(d => !isNaN(d.time) && !isNaN(d.value));
-                    
+
                     return { points, baseline };
                 }
-                
+
                 // 5D: timeshares[].minutes[] 有 timestamp, price
                 // baseline = 第一個交易日的 pre_close
                 if (timeRange === '5D') {
@@ -223,12 +223,12 @@
                         .filter(s => s?.minutes?.length > 0)
                         .sort((a, b) => (a.date || 0) - (b.date || 0))
                         .slice(-5);
-                    
+
                     if (!sessions.length) return { points: [], baseline: null };
-                    
+
                     const baseline = parseFloat(sessions[0].pre_close ?? data.base_price);
                     const points = [];
-                    
+
                     sessions.forEach(day => {
                         if (Array.isArray(day?.minutes)) {
                             day.minutes.forEach(m => {
@@ -240,20 +240,20 @@
                             });
                         }
                     });
-                    
+
                     return { points, baseline };
                 }
-                
+
                 // 1M/3M/6M/1Y: klines[] 有 timestamp, close
                 // baseline = 第一筆 close，從第二筆開始繪製
                 const klines = data?.klines;
                 if (!Array.isArray(klines) || klines.length < 2) {
                     return { points: [], baseline: null };
                 }
-                
+
                 const baseline = parseFloat(klines[0].close);
                 const points = [];
-                
+
                 // 從第二筆開始（第一筆是基準）
                 for (let i = 1; i < klines.length; i++) {
                     const k = klines[i];
@@ -263,7 +263,7 @@
                         points.push({ time, value });
                     }
                 }
-                
+
                 return { points, baseline };
             } catch (e) {
                 console.error('parseChartData error:', e);
@@ -315,11 +315,11 @@
         // 解析股票詳情數據
         const parseDetailData = (data) => {
             if (!data) return null;
-            
+
             const raw = data;
             const lastDone = parseFloat(raw.last_done);
             const prevClose = parseFloat(raw.prev_close);
-            
+
             // 基礎資料映射
             const baseData = {
                 ...raw,
@@ -350,13 +350,13 @@
         // 計算衍生欄位
         const calculateDerivedFields = (data) => {
             const { last_done, prev_close, total_shares, circulating_shares, amount, high, low, eps_ttm, eps_forecast, eps, bps } = data;
-            
+
             const change = last_done - prev_close;
             const changePercent = (prev_close > 0) ? (change / prev_close) * 100 : 0;
             const marketCap = last_done * total_shares;
             const turnoverRate = (circulating_shares > 0) ? (amount / circulating_shares) * 100 : 0;
             const amplitude = (prev_close > 0) ? ((high - low) / prev_close) * 100 : 0;
-            
+
             const peTtm = (eps_ttm && eps_ttm > 0) ? last_done / eps_ttm : null;
             const peDynamic = (eps_forecast && eps_forecast > 0) ? last_done / eps_forecast : null;
             const peStatic = (eps && eps > 0) ? last_done / eps : null;
@@ -1392,23 +1392,28 @@
             const chartRef = useRef(null);
             const seriesRef = useRef(null);
             const resizeObserverRef = useRef(null);
-            const tooltipRef = useRef(null);
+            const priceLineRef = useRef(null);
+            const maxPriceLineRef = useRef(null);
+            const minPriceLineRef = useRef(null);
 
             // Tooltip 顯示狀態
             const [tooltipData, setTooltipData] = useState(null);
 
-            // 格式化時間（根據瀏覽器時區）
+            // 格式化日期與時間 (Split for new tooltip layout)
             const formatTooltipTime = (timestamp) => {
                 const date = new Date(timestamp * 1000);
-                const options = {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
+                return {
+                    dateStr: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                    timeStr: date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
                 };
-                return date.toLocaleString(undefined, options);
             };
+
+            // 計算漲跌幅（基於 baseline）
+            const getChangeInfo = useCallback((price) => {
+                if (baseline == null || price == null) return { change: 0, isPositive: false };
+                const change = (price - baseline) / baseline;
+                return { change, isPositive: change >= 0 };
+            }, [baseline]);
 
             // 初始化圖表
             useEffect(() => {
@@ -1416,17 +1421,17 @@
 
                 // 創建圖表 (只執行一次)
                 const chart = window.LightweightCharts.createChart(chartContainerRef.current, {
-                    layout: { 
-                        background: { type: 'solid', color: 'transparent' }, 
-                        textColor: '#9CA3AF' 
+                    layout: {
+                        background: { type: 'solid', color: 'transparent' },
+                        textColor: '#9CA3AF'
                     },
-                    grid: { 
-                        vertLines: { visible: false }, 
-                        horzLines: { color: 'rgba(42, 46, 57, 0.15)' } 
+                    grid: {
+                        vertLines: { visible: false },
+                        horzLines: { color: 'rgba(42, 46, 57, 0.15)' }
                     },
                     rightPriceScale: { borderVisible: false },
-                    timeScale: { 
-                        borderVisible: false, 
+                    timeScale: {
+                        borderVisible: false,
                         timeVisible: true,
                         secondsVisible: false,
                         // 強制顯示完整數據範圍（無論螢幕多窄）
@@ -1439,16 +1444,16 @@
                             // tickMarkType: 0=Year, 1=Month, 2=DayOfMonth, 3=Time, 4=TimeWithSeconds
                             if (tickMarkType <= 2) {
                                 // 日期格式
-                                return date.toLocaleDateString(undefined, { 
-                                    month: 'short', 
-                                    day: 'numeric' 
+                                return date.toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric'
                                 });
                             }
                             // 時間格式
-                            return date.toLocaleTimeString(undefined, { 
-                                hour: '2-digit', 
+                            return date.toLocaleTimeString(undefined, {
+                                hour: '2-digit',
                                 minute: '2-digit',
-                                hour12: false 
+                                hour12: false
                             });
                         },
                     },
@@ -1456,16 +1461,22 @@
                         // Crosshair label 和 tooltip 時間格式化
                         timeFormatter: (timestamp) => {
                             const date = new Date(timestamp * 1000);
-                            return date.toLocaleTimeString(undefined, { 
-                                hour: '2-digit', 
+                            return date.toLocaleTimeString(undefined, {
+                                hour: '2-digit',
                                 minute: '2-digit',
-                                hour12: false 
+                                hour12: false
                             });
                         },
                     },
-                    crosshair: { 
-                        vertLine: { labelVisible: false },
-                        horzLine: { labelVisible: true },
+                    crosshair: {
+                        mode: window.LightweightCharts.CrosshairMode.Normal,
+                        vertLine: {
+                            visible: true,
+                            labelVisible: false,
+                            style: 0, // Solid style
+                            color: 'rgba(255,255,255,0.2)'
+                        },
+                        horzLine: { visible: false, labelVisible: false },
                     },
                     handleScroll: false,
                     handleScale: false,
@@ -1483,7 +1494,8 @@
                     bottomFillColor2: 'rgba(240, 58, 85, 0.28)',
                     lineWidth: 2,
                     priceLineVisible: false,
-                    lastValueVisible: true,
+                    lastValueVisible: false, // 隱藏預設的最後價格標籤
+                    crosshairMarkerVisible: false, // 隱藏預設的圓點，我們自己畫
                 });
                 seriesRef.current = series;
 
@@ -1500,20 +1512,15 @@
                 });
                 resizeObserverRef.current.observe(chartContainerRef.current);
 
-                // Floating Tooltip: 訂閱 crosshairMove 事件
-                const container = chartContainerRef.current;
-                const toolTipWidth = 120;
-                const toolTipHeight = 70;
-                const toolTipMargin = 15;
-
+                // Tooltip: 訂閱 crosshairMove 事件
                 chart.subscribeCrosshairMove(param => {
                     if (
                         param.point === undefined ||
                         !param.time ||
                         param.point.x < 0 ||
-                        param.point.x > container.clientWidth ||
+                        param.point.x > chartContainerRef.current.clientWidth ||
                         param.point.y < 0 ||
-                        param.point.y > container.clientHeight
+                        param.point.y > chartContainerRef.current.clientHeight
                     ) {
                         setTooltipData(null);
                     } else {
@@ -1522,29 +1529,24 @@
                             setTooltipData(null);
                             return;
                         }
+
                         const price = seriesData.value !== undefined ? seriesData.value : seriesData.close;
-                        const coordinate = series.priceToCoordinate(price);
-                        if (coordinate === null) {
+
+                        // 轉換座標
+                        const x = chart.timeScale().timeToCoordinate(param.time);
+                        const y = series.priceToCoordinate(price);
+
+                        if (x === null || y === null) {
                             setTooltipData(null);
                             return;
                         }
 
-                        // 計算 tooltip 位置（浮動在數據點旁邊）
-                        let shiftedX = param.point.x - toolTipWidth / 2;
-                        shiftedX = Math.max(0, Math.min(container.clientWidth - toolTipWidth, shiftedX));
-                        
-                        let coordinateY = coordinate - toolTipHeight - toolTipMargin > 0
-                            ? coordinate - toolTipHeight - toolTipMargin
-                            : Math.max(0, Math.min(
-                                container.clientHeight - toolTipHeight - toolTipMargin,
-                                coordinate + toolTipMargin
-                            ));
-
                         setTooltipData({
-                            x: shiftedX,
-                            y: coordinateY,
-                            price: price,
+                            x,
+                            y,
+                            price,
                             time: param.time,
+                            containerWidth: chartContainerRef.current.clientWidth,
                         });
                     }
                 });
@@ -1555,33 +1557,130 @@
                     chartRef.current = null;
                     seriesRef.current = null;
                 };
-            }, []);
+            }, []); // Empty dependency array - init once
 
             // 更新數據
             useEffect(() => {
                 if (!seriesRef.current || !chartRef.current) return;
-                
+
                 if (data && data.length > 0) {
                     // 使用傳入的 baseline，若無則用第一個數據點
                     const basePrice = baseline ?? data[0].value;
-                    seriesRef.current.applyOptions({ 
-                        baseValue: { type: 'price', price: basePrice } 
+                    seriesRef.current.applyOptions({
+                        baseValue: { type: 'price', price: basePrice }
                     });
                     seriesRef.current.setData(data);
+
+                    // 1. 設定 Markers (Max/Min)
+                    let minVal = Infinity;
+                    let maxVal = -Infinity;
+                    let minTime = null;
+                    let maxTime = null;
+
+                    data.forEach(d => {
+                        if (d.value < minVal) {
+                            minVal = d.value;
+                            minTime = d.time;
+                        }
+                        if (d.value > maxVal) {
+                            maxVal = d.value;
+                            maxTime = d.time;
+                        }
+                    });
+
+                    const markers = [];
+                    if (maxTime) {
+                        markers.push({
+                            time: maxTime,
+                            position: 'aboveBar',
+                            color: '#06A870', // Green
+                            shape: 'arrowDown',
+                            text: '最高',
+                            size: 0.5, // default is 1
+                        });
+                    }
+                    if (minTime) {
+                        markers.push({
+                            time: minTime,
+                            position: 'belowBar',
+                            color: '#F03A55', // Red
+                            shape: 'arrowUp',
+                            text: '最低',
+                            size: 0.5,
+                        });
+                    }
+                    seriesRef.current.setMarkers(markers);
+
+                    // 1.5 Add Max/Min Lines
+                    if (maxPriceLineRef.current) {
+                        seriesRef.current.removePriceLine(maxPriceLineRef.current);
+                        maxPriceLineRef.current = null;
+                    }
+                    if (minPriceLineRef.current) {
+                        seriesRef.current.removePriceLine(minPriceLineRef.current);
+                        minPriceLineRef.current = null;
+                    }
+
+                    if (maxVal > -Infinity) {
+                        maxPriceLineRef.current = seriesRef.current.createPriceLine({
+                            price: maxVal,
+                            color: '#06A870', // Green
+                            lineWidth: 1,
+                            lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                            axisLabelVisible: true,
+                            title: '',
+                        });
+                    }
+
+                    if (minVal < Infinity) {
+                        minPriceLineRef.current = seriesRef.current.createPriceLine({
+                            price: minVal,
+                            color: '#F03A55', // Red
+                            lineWidth: 1,
+                            lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                            axisLabelVisible: true,
+                            title: '',
+                        });
+                    }
+
+                    // 2. 設定 Current Price Line
+                    if (priceLineRef.current) {
+                        seriesRef.current.removePriceLine(priceLineRef.current);
+                        priceLineRef.current = null;
+                    }
+
+                    const lastData = data[data.length - 1];
+                    if (lastData) {
+                        priceLineRef.current = seriesRef.current.createPriceLine({
+                            price: lastData.value,
+                            color: '#9CA3AF', // Gray-400
+                            lineWidth: 1,
+                            lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                            axisLabelVisible: true,
+                            title: '',
+                        });
+                    }
+
                     // 使用 fitContent 強制顯示完整時間範圍
                     chartRef.current.timeScale().fitContent();
                 } else {
                     // 清空數據
                     seriesRef.current.setData([]);
+                    seriesRef.current.setMarkers([]);
+                    if (priceLineRef.current) {
+                        seriesRef.current.removePriceLine(priceLineRef.current);
+                        priceLineRef.current = null;
+                    }
+                    if (maxPriceLineRef.current) {
+                        seriesRef.current.removePriceLine(maxPriceLineRef.current);
+                        maxPriceLineRef.current = null;
+                    }
+                    if (minPriceLineRef.current) {
+                        seriesRef.current.removePriceLine(minPriceLineRef.current);
+                        minPriceLineRef.current = null;
+                    }
                 }
             }, [data, baseline]);
-
-            // 計算漲跌幅（基於 baseline）
-            const getChangeInfo = (price) => {
-                if (baseline == null || price == null) return { change: 0, isPositive: false };
-                const change = (price - baseline) / baseline;
-                return { change, isPositive: change >= 0 };
-            };
 
             return (
                 <div className="relative w-full h-64 min-h-[256px] landscape:h-full landscape:min-h-0">
@@ -1600,39 +1699,63 @@
                             </div>
                         </div>
                     )}
-                    <div ref={chartContainerRef} className="w-full h-full" />
-                    
-                    {/* Floating Tooltip */}
-                    {tooltipData && (
-                        <div
-                            ref={tooltipRef}
-                            className="absolute pointer-events-none z-20 px-3 py-2 rounded-lg shadow-lg border text-xs
-                                       bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600"
-                            style={{
-                                left: tooltipData.x,
-                                top: tooltipData.y,
-                                minWidth: 100,
-                            }}
-                        >
-                            {stockName && (
-                                <div className="font-medium text-blue-600 dark:text-blue-400 mb-1 truncate">{stockName}</div>
-                            )}
-                            <div className="font-bold text-lg text-gray-900 dark:text-white">
-                                {tooltipData.price?.toFixed(2)}
-                            </div>
-                            {(() => {
-                                const { change, isPositive } = getChangeInfo(tooltipData.price);
-                                return (
-                                    <div className={`text-xs font-medium ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                    <div ref={chartContainerRef} className="w-full h-full cursor-crosshair" />
+
+                    {/* Custom Tooltip Overlay (Fixed Top) */}
+                    {tooltipData && (() => {
+                        const { change, isPositive } = getChangeInfo(tooltipData.price);
+                        const { dateStr, timeStr } = formatTooltipTime(tooltipData.time);
+
+                        // Tooltip Position Logic (Smooth Clamping)
+                        const TOOLTIP_WIDTH = 120;
+                        const halfWidth = TOOLTIP_WIDTH / 2;
+                        const containerW = tooltipData.containerWidth || 0;
+                        const maxLeft = containerW - TOOLTIP_WIDTH;
+                        const idealLeft = tooltipData.x - halfWidth;
+                        const clampedLeft = Math.max(0, Math.min(idealLeft, maxLeft));
+
+                        let tooltipStyle = {
+                            position: 'absolute',
+                            top: '12px',
+                            left: `${clampedLeft}px`,
+                            width: `${TOOLTIP_WIDTH}px`,
+                            pointerEvents: 'none',
+                            zIndex: 50,
+                        };
+
+                        return (
+                            <>
+                                {/* Crosshair Dot */}
+                                <div
+                                    className="absolute w-3 h-3 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)] border-2 border-blue-500 z-30 pointer-events-none"
+                                    style={{
+                                        left: tooltipData.x,
+                                        top: tooltipData.y,
+                                        transform: 'translate(-50%, -50%)'
+                                    }}
+                                />
+
+                                {/* Fixed Tooltip Box (Vertical Stack) */}
+                                <div
+                                    className="absolute px-3 py-2 rounded-xl shadow-xl backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-gray-100 dark:border-gray-700 flex flex-col items-center min-w-[90px]"
+                                    style={tooltipStyle}
+                                >
+                                    {/* Date Time */}
+                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono text-center leading-tight mb-1">
+                                        {dateStr} <span className="opacity-75 ml-1">{timeStr}</span>
+                                    </div>
+                                    {/* Price */}
+                                    <div className="text-xl font-bold text-gray-900 dark:text-white font-mono leading-none">
+                                        {tooltipData.price?.toFixed(2)}
+                                    </div>
+                                    {/* Change */}
+                                    <div className={`text-xs font-bold font-mono mt-0.5 ${isPositive ? 'text-quote-up' : 'text-quote-down'}`}>
                                         {formatPercent(change)}
                                     </div>
-                                );
-                            })()}
-                            <div className="text-gray-500 dark:text-gray-400 mt-1">
-                                {formatTooltipTime(tooltipData.time)}
-                            </div>
-                        </div>
-                    )}
+                                </div>
+                            </>
+                        );
+                    })()}
                 </div>
             );
         };
@@ -1643,7 +1766,7 @@
         // ========================================
         const TimeRangeSwitcher = ({ selectedRange, onRangeChange, rangeData, className }) => {
             const ranges = ['1D', '5D', '1M', '3M', '6M', '1Y'];
-            
+
             return (
                 <div className={className || "grid grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-2"}>
                     {ranges.map(range => {
@@ -1651,25 +1774,24 @@
                         const changePercent = rangeData?.[range]?.change;
                         const isPositive = changePercent > 0;
                         const isNegative = changePercent < 0;
-                        
+
                         return (
                             <button
                                 key={range}
                                 onClick={() => onRangeChange(range)}
                                 className={`w-full min-w-0 whitespace-normal break-words py-1.5 px-2 rounded-lg text-center transition-colors leading-tight
-                                    ${isActive 
-                                        ? 'bg-blue-600' 
+                                    ${isActive
+                                        ? 'bg-blue-600'
                                         : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
                                     }`}
                             >
                                 <div className={`text-xs font-medium ${isActive ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
                                     {range}
                                 </div>
-                                <div className={`text-xs font-bold ${
-                                    isPositive ? 'text-emerald-500' : 
-                                    isNegative ? 'text-red-500' : 
-                                    (isActive ? 'text-white/70' : 'text-gray-400')
-                                }`}>
+                                <div className={`text-xs font-bold ${isPositive ? 'text-emerald-500' :
+                                    isNegative ? 'text-red-500' :
+                                        (isActive ? 'text-white/70' : 'text-gray-400')
+                                    }`}>
                                     {changePercent != null ? formatPercent(changePercent) : '-'}
                                 </div>
                             </button>
@@ -1716,7 +1838,7 @@
             // 根據 counter_id 判斷市場
             const market = data?.counter_id?.includes('/HK/') ? 'HK' : 'US';
             const currencyLabel = market === 'HK' ? 'HKD' : 'USD';
-            
+
             const DETAIL_FIELDS = [
                 { key: 'stock_name', label: '名稱' },
                 { key: 'counter_id', label: '代碼', format: 'code' },
@@ -1804,13 +1926,12 @@
                                 {field.label}
                                 {field.superscript && <sup className="text-xs text-gray-400 ml-0.5">{field.superscript}</sup>}
                             </span>
-                            <span className={`text-sm font-medium ${
-                                (field.key === 'change' || field.key === 'changePercent')
-                                    ? getColorClass(data?.[field.key])
-                                    : field.compareWithPrevClose
-                                        ? getColorClass(data?.[field.key] - data?.prev_close)
-                                        : 'text-gray-900 dark:text-white'
-                            }`}>
+                            <span className={`text-sm font-medium ${(field.key === 'change' || field.key === 'changePercent')
+                                ? getColorClass(data?.[field.key])
+                                : field.compareWithPrevClose
+                                    ? getColorClass(data?.[field.key] - data?.prev_close)
+                                    : 'text-gray-900 dark:text-white'
+                                }`}>
                                 {renderValue(field)}
                             </span>
                         </div>
@@ -1880,18 +2001,18 @@
                 const fetchDetailData = async () => {
                     if (controller.signal.aborted) return;
                     setDetailLoading(true);
-                    
+
                     try {
                         const apiUrl = DETAIL_API(stock.counter_id) + `&locale=${language}`;
                         const url = CHART_PROXY + encodeURIComponent(apiUrl);
                         console.log(`[Detail] Fetching for ${stock.counter_id}:`, apiUrl);
-                        
+
                         const res = await fetch(url, { signal: controller.signal });
                         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                        
+
                         const json = await res.json();
                         console.log(`[Detail] Response:`, json);
-                        
+
                         const parsed = parseDetailData(json.data);
                         setDetailData(parsed);
                     } catch (e) {
@@ -1907,22 +2028,22 @@
 
                 const fetchRangeData = async (range) => {
                     if (controller.signal.aborted) return;
-                    
+
                     try {
                         const apiUrl = CHART_APIS[range](stock.counter_id);
                         const url = CHART_PROXY + encodeURIComponent(apiUrl);
                         console.log(`[Chart] Fetching ${range} for ${stock.counter_id}:`, apiUrl);
-                        
+
                         const res = await fetch(url, { signal: controller.signal });
                         if (!res.ok) {
                             console.error(`[Chart] ${range} HTTP error:`, res.status);
                             setError(`HTTP ${res.status}`);
                             return;
                         }
-                        
+
                         const json = await res.json();
                         console.log(`[Chart] ${range} raw response:`, json);
-                        
+
                         const { points, baseline } = parseChartData(json.data, range);
                         console.log(`[Chart] ${range} parsed: ${points.length} points, baseline=${baseline}`);
 
@@ -2018,7 +2139,7 @@
             const industry = stock?.indicators?.[IND_IDX.INDUSTRY];
             const industryChange = sectorAvgChanges?.[industry] || 0;
             const industryData = sectorData?.[industry];
-            
+
             // 取得行業成分股
             const sectorStocks = useMemo(() => {
                 if (!industry || !processedSectors) return [];
@@ -2040,13 +2161,13 @@
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
                     onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-                    
+
                     <div className="relative w-full max-w-[80vw] max-h-[80vh] landscape:w-full landscape:h-full landscape:max-w-none landscape:max-h-none landscape:rounded-none landscape:m-0 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <img src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`} 
-                                        className="w-10 h-10 rounded-full" 
+                                    <img src={`https://assets.lbkrs.com/ticker/${stock.counter_id}.png`}
+                                        className="w-10 h-10 rounded-full"
                                         onError={(e) => e.target.style.display = 'none'} />
                                     <div>
                                         <div className="font-bold text-lg dark:text-white">{stock.name}</div>
@@ -2086,7 +2207,7 @@
                                 </div>
                             )}
                         </div>
-                        
+
                         <div className="relative flex-1 flex flex-col landscape:flex-row min-h-0 overflow-hidden">
                             {/* Tab Header - Portrait Only */}
                             <div className="landscape:hidden">
@@ -2095,9 +2216,9 @@
 
                             {/* Left Column: Info Grid - Landscape Only */}
                             <div className="hidden landscape:block w-[35%] h-full overflow-y-auto border-r border-gray-200 dark:border-gray-700 scroll-container">
-                                <StockInfoGrid 
-                                    data={detailData} 
-                                    loading={detailLoading} 
+                                <StockInfoGrid
+                                    data={detailData}
+                                    loading={detailLoading}
                                     className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-0 p-4"
                                 />
                             </div>
@@ -2117,9 +2238,9 @@
 
                                 {/* Landscape Switcher (Right side) */}
                                 <div className="hidden landscape:flex flex-col border-l border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/20 w-26 min-w-[6.5rem]">
-                                    <TimeRangeSwitcher 
-                                        selectedRange={selectedRange} 
-                                        onRangeChange={setSelectedRange} 
+                                    <TimeRangeSwitcher
+                                        selectedRange={selectedRange}
+                                        onRangeChange={setSelectedRange}
                                         rangeData={rangeData}
                                         className="flex flex-col gap-2 p-2 h-full overflow-y-auto no-scrollbar overscroll-y-contain"
                                     />
@@ -2134,9 +2255,9 @@
                             {/* 行業成分股明細 - 覆蓋層 (Overlay) */}
                             {showSectorStocks && sectorStocks.length > 0 && (
                                 <div className="absolute inset-0 z-20 bg-white dark:bg-gray-900 flex flex-col border-t border-gray-200 dark:border-gray-700">
-                                    <StockTable 
-                                        stocks={sectorStocks} 
-                                        timeRangeIdx={timeRangeIdx || IND_IDX.CHG_1D} 
+                                    <StockTable
+                                        stocks={sectorStocks}
+                                        timeRangeIdx={timeRangeIdx || IND_IDX.CHG_1D}
                                         className="h-full"
                                     />
                                 </div>
@@ -3086,8 +3207,8 @@
                     />
 
                     {/* Stock Detail Modal */}
-                    <StockDetailModal 
-                        stock={selectedStock} 
+                    <StockDetailModal
+                        stock={selectedStock}
                         onClose={handleCloseStockModal}
                         sectorData={sectorData}
                         sectorAvgChanges={sectorAvgChanges}
