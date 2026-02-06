@@ -2269,7 +2269,529 @@
         };
 
 
+
+        // ========================================
+        // Fear & Greed Index (恐貪指數) Components
+        // ========================================
+
+        // Constants & Helpers
+        const FG_RANGES = [
+            { min: 0, max: 19, label: '極度恐懼', color: '#ef4444', textClass: 'text-red-500' },     // 0-19 Red
+            { min: 20, max: 39, label: '恐懼', color: '#f97316', textClass: 'text-orange-500' },     // 20-39 Orange
+            { min: 40, max: 59, label: '中性', color: '#eab308', textClass: 'text-yellow-500' },     // 40-59 Yellow
+            { min: 60, max: 79, label: '貪婪', color: '#84cc16', textClass: 'text-lime-500' },       // 60-79 Light Green
+            { min: 80, max: 100, label: '極度貪婪', color: '#22c55e', textClass: 'text-green-500' }, // 80-100 Green
+        ];
+
+        const getFGStatus = (val) => {
+            const num = Math.round(val);
+            return FG_RANGES.find(r => num >= r.min && num <= r.max) || FG_RANGES[2];
+        };
+
+        const fetchFearGreedData = async () => {
+            const TARGET = "https://feargreedmeter.com/_next/data/UTI167DfsxwvK8Klmh1X2/fear-and-greed-index.json";
+            const PROXY = "https://api.codetabs.com/v1/proxy?quest=";
+            const url = PROXY + encodeURIComponent(TARGET);
+
+            try {
+                const res = await fetch(url, { cache: 'no-store' });
+                if (!res.ok) throw new Error("Failed to fetch FG Index");
+                const json = await res.json();
+                const list = json?.pageProps?.data?.fgiData?.fgi;
+                return Array.isArray(list) ? list : null;
+            } catch (e) {
+                console.error("FG Index Fetch Error:", e);
+                return null;
+            }
+        };
+
+        // Header Widget Icon
+        const FearGreedWidget = ({ data, onClick }) => {
+            if (!data || data.length === 0) return null;
+
+            const currentItem = data[data.length - 1];
+            const prevItem = data[data.length - 2];
+            const val = Math.round(currentItem.now);
+            const prevVal = prevItem ? Math.round(prevItem.now) : val;
+            const status = getFGStatus(val);
+
+            // Trend
+            let TrendIcon = null;
+            if (val > prevVal) TrendIcon = <span className="text-green-500 text-[10px] mr-0.5">▲</span>;
+            else if (val < prevVal) TrendIcon = <span className="text-red-500 text-[10px] mr-0.5">▼</span>;
+
+            // Gauge calculations
+            // Radius 18, Stroke 4.
+            // Arc length = PI * 18 ≈ 56.5
+            const radius = 18;
+            const circumference = Math.PI * radius;
+            const progress = (val / 100) * circumference;
+
+            return (
+                <button
+                    onClick={onClick}
+                    className="flex items-center justify-center bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors group mr-2 sm:mr-4 px-2 py-1"
+                    title={`恐貪指數: ${status.label} (${val})`}
+                >
+                    <div className="relative w-[44px] h-[24px] flex items-end justify-center">
+                        <svg width="44" height="24" viewBox="0 0 44 24" className="overflow-visible">
+                            {/* Background Arc */}
+                            <path d="M 2 22 A 18 18 0 0 1 42 22" fill="none" stroke="#e5e7eb" strokeWidth="4" strokeLinecap="round" className="dark:stroke-gray-700" />
+
+                            {/* Active Arc */}
+                            <path
+                                d="M 2 22 A 18 18 0 0 1 42 22"
+                                fill="none"
+                                stroke={status.color}
+                                strokeWidth="4"
+                                strokeLinecap="round"
+                                strokeDasharray={`${progress} ${circumference}`}
+                                strokeDashoffset="0"
+                            />
+                        </svg>
+
+                        {/* Centered Value & Triangle - Positioned at the bottom center inside the arc */}
+                        <div className="absolute bottom-0 left-0 right-0 flex items-baseline justify-center mb-0.5 transform translate-y-0.5">
+                            {TrendIcon}
+                            <span className={`text-sm font-bold font-mono leading-none ${status.textClass}`}>{val}</span>
+                        </div>
+                    </div>
+                </button>
+            );
+        };
+
+        // Large Gauge for Modal
+        const FearGreedGauge = ({ value }) => {
+            const radius = 80;
+            const strokeWidth = 16;
+            const center = 100;
+
+            const createSegment = (index, color) => {
+                const startAngle = 180 + index * 36 + 2;
+                const endAngle = 180 + (index + 1) * 36 - 2;
+
+                const startRad = startAngle * Math.PI / 180;
+                const endRad = endAngle * Math.PI / 180;
+
+                const x1 = center + radius * Math.cos(startRad);
+                const y1 = center + radius * Math.sin(startRad);
+                const x2 = center + radius * Math.cos(endRad);
+                const y2 = center + radius * Math.sin(endRad);
+
+                // SVG Path: M start A r r 0 0 1 end
+                return (
+                    <path
+                        key={index}
+                        d={`M ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2}`}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={strokeWidth}
+                        strokeLinecap="round"
+                    />
+                );
+            };
+
+            // Dot Position
+            const val = Math.max(0, Math.min(100, value));
+            const angle = 180 + (val / 100) * 180;
+            const rad = angle * Math.PI / 180;
+            // Position dot on the arc center line
+            const dotX = center + radius * Math.cos(rad);
+            const dotY = center + radius * Math.sin(rad);
+
+            return (
+                <div className="relative w-[200px] h-[110px] flex justify-center">
+                    <svg width="200" height="110" viewBox="0 0 200 110">
+                        {FG_RANGES.map((r, i) => createSegment(i, r.color))}
+
+                        {/* Indicator Dot */}
+                        <circle
+                            cx={dotX}
+                            cy={dotY}
+                            r="14"
+                            fill="white"
+                            stroke="rgba(0,0,0,0.2)"
+                            strokeWidth="2"
+                            className="drop-shadow-md transition-all duration-500 ease-out"
+                        />
+                        {/* Inner Dot */}
+                        <circle
+                            cx={dotX}
+                            cy={dotY}
+                            r="8"
+                            fill={FG_RANGES.find(r => val >= r.min && val <= r.max)?.color || '#eab308'}
+                            className="transition-all duration-500 ease-out"
+                        />
+                    </svg>
+                </div>
+            );
+        };
+
+        // Historical Chart with multi-color line segments
+        const FearGreedChart = ({ data, timeRange }) => {
+            const chartContainerRef = useRef(null);
+            const chartRef = useRef(null);
+            const seriesListRef = useRef([]);
+
+            // Get color for a value based on FG_RANGES
+            const getColor = (value) => {
+                const range = FG_RANGES.find(r => value >= r.min && value <= r.max);
+                return range ? range.color : '#eab308';
+            };
+
+            // Filter data based on timeRange
+            const chartData = useMemo(() => {
+                if (!data) return [];
+                const now = new Date();
+                let cutoffDate = new Date(0); // All
+
+                if (timeRange === '1M') {
+                    cutoffDate = new Date();
+                    cutoffDate.setMonth(now.getMonth() - 1);
+                } else if (timeRange === '1Y') {
+                    cutoffDate = new Date();
+                    cutoffDate.setFullYear(now.getFullYear() - 1);
+                }
+
+                return data
+                    .map(item => ({
+                        time: item.date, // String 'YYYY-MM-DD' works for Lightweight Charts
+                        value: item.now,
+                        dateObj: new Date(item.date)
+                    }))
+                    .filter(d => d.dateObj >= cutoffDate)
+                    .map(({ time, value }) => ({ time, value }));
+            }, [data, timeRange]);
+
+            // Create colored segments for multi-color line
+            const createColoredSegments = (chartData) => {
+                if (chartData.length === 0) return [];
+                const segments = []; // { color, data: [{time, value}] }
+                let currentSegment = null;
+
+                for (let i = 0; i < chartData.length; i++) {
+                    const point = chartData[i];
+                    const color = getColor(point.value);
+
+                    if (!currentSegment || currentSegment.color !== color) {
+                        // Start new segment
+                        if (currentSegment && currentSegment.data.length > 0) {
+                            // Add transition point to old segment
+                            currentSegment.data.push({ ...point });
+                        }
+                        currentSegment = { color, data: [] };
+                        // Add previous point as transition start
+                        if (i > 0) {
+                            currentSegment.data.push({ ...chartData[i - 1] });
+                        }
+                        currentSegment.data.push({ ...point });
+                        segments.push(currentSegment);
+                    } else {
+                        currentSegment.data.push({ ...point });
+                    }
+                }
+                return segments;
+            };
+
+            // Find min/max values for markers
+            const extremes = useMemo(() => {
+                if (chartData.length === 0) return { min: null, max: null };
+                let minPoint = chartData[0];
+                let maxPoint = chartData[0];
+                for (const point of chartData) {
+                    if (point.value < minPoint.value) minPoint = point;
+                    if (point.value > maxPoint.value) maxPoint = point;
+                }
+                return { min: minPoint, max: maxPoint };
+            }, [chartData]);
+
+            useEffect(() => {
+                if (!chartContainerRef.current) return;
+
+                const chart = window.LightweightCharts.createChart(chartContainerRef.current, {
+                    layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#9CA3AF' },
+                    grid: { vertLines: { visible: false }, horzLines: { color: 'rgba(42, 46, 57, 0.1)' } },
+                    rightPriceScale: {
+                        borderVisible: false,
+                        visible: true,
+                        autoScale: false,
+                        scaleMargins: { top: 0.05, bottom: 0.05 },
+                    },
+                    timeScale: { borderVisible: false, fixLeftEdge: true, fixRightEdge: true },
+                    handleScroll: false,
+                    handleScale: false,
+                    crosshair: {
+                        vertLine: {
+                            labelVisible: true,
+                            labelBackgroundColor: '#4B5563',
+                        },
+                        horzLine: {
+                            labelVisible: true,
+                            labelBackgroundColor: '#4B5563',
+                        }
+                    },
+                    localization: {
+                        priceFormatter: (price) => {
+                            if (price < 0 || price > 100) return "";
+                            return Math.round(price).toString();
+                        },
+                        dateFormat: 'yyyy/MM/dd',
+                    },
+                });
+
+                // Custom price scale to fix -20 to 120
+                chart.priceScale('right').applyOptions({
+                    autoScale: false,
+                    minValue: -20,
+                    maxValue: 120,
+                    scaleMargins: { top: 0.02, bottom: 0.02 },
+                });
+
+                chartRef.current = chart;
+                seriesListRef.current = [];
+
+                const resizeObserver = new ResizeObserver(entries => {
+                    if (entries.length > 0 && chartRef.current) {
+                        const { width, height } = entries[0].contentRect;
+                        if (width > 0 && height > 0) {
+                            chartRef.current.resize(width, height);
+                            chartRef.current.timeScale().fitContent();
+                        }
+                    }
+                });
+                resizeObserver.observe(chartContainerRef.current);
+
+                return () => {
+                    resizeObserver.disconnect();
+                    chart.remove();
+                };
+            }, []);
+
+            // Update series when chartData changes
+            useEffect(() => {
+                if (!chartRef.current) return;
+
+                // Remove old series
+                seriesListRef.current.forEach(s => {
+                    try { chartRef.current.removeSeries(s); } catch (e) { }
+                });
+                seriesListRef.current = [];
+
+                if (chartData.length === 0) return;
+
+                // Create colored segments
+                const segments = createColoredSegments(chartData);
+
+                // Create a series for each segment
+                segments.forEach((segment, idx) => {
+                    const series = chartRef.current.addLineSeries({
+                        color: segment.color,
+                        lineWidth: 2,
+                        crosshairMarkerVisible: idx === segments.length - 1, // Only last segment shows crosshair
+                        crosshairMarkerRadius: 4,
+                        priceScaleId: 'right',
+                        lastValueVisible: false,
+                        priceLineVisible: false,
+                        autoscaleInfoProvider: () => ({
+                            priceRange: { minValue: -20, maxValue: 120 },
+                        }),
+                    });
+                    series.setData(segment.data);
+                    seriesListRef.current.push(series);
+                });
+
+                // Add reference lines at 20, 40, 60, 80
+                if (seriesListRef.current.length > 0) {
+                    const mainSeries = seriesListRef.current[0];
+                    const commonOptions = { lineWidth: 1, lineStyle: 2, axisLabelVisible: false };
+
+                    mainSeries.createPriceLine({ price: 20, color: 'rgba(239, 68, 68, 0.5)', ...commonOptions }); // Red
+                    mainSeries.createPriceLine({ price: 40, color: 'rgba(249, 115, 22, 0.5)', ...commonOptions }); // Orange
+                    mainSeries.createPriceLine({ price: 60, color: 'rgba(132, 204, 22, 0.5)', ...commonOptions }); // Lime
+                    mainSeries.createPriceLine({ price: 80, color: 'rgba(34, 197, 94, 0.5)', ...commonOptions }); // Green
+                }
+
+                // Add min/max markers to the correct series
+                if (seriesListRef.current.length > 0 && extremes.min && extremes.max) {
+                    const markersBySeries = new Map(); // seriesIndex -> markers[]
+
+                    const addMarkerToSeries = (point, position, shape) => {
+                        // Find which segment contains this point
+                        for (let i = 0; i < segments.length; i++) {
+                            const hasPoint = segments[i].data.some(d => d.time === point.time);
+                            if (hasPoint) {
+                                if (!markersBySeries.has(i)) markersBySeries.set(i, []);
+                                markersBySeries.get(i).push({
+                                    time: point.time,
+                                    position,
+                                    color: getColor(point.value),
+                                    shape,
+                                    text: Math.round(point.value).toString(),
+                                });
+                                break; // Only add to the first matching series
+                            }
+                        }
+                    };
+
+                    addMarkerToSeries(extremes.min, 'belowBar', 'arrowUp');
+
+                    if (extremes.max.time !== extremes.min.time) {
+                        addMarkerToSeries(extremes.max, 'aboveBar', 'arrowDown');
+                    }
+
+                    // Apply markers
+                    markersBySeries.forEach((markers, seriesIndex) => {
+                        const series = seriesListRef.current[seriesIndex];
+                        if (series) {
+                            markers.sort((a, b) => a.time.localeCompare(b.time));
+                            series.setMarkers(markers);
+                        }
+                    });
+                }
+
+                chartRef.current.timeScale().fitContent();
+            }, [chartData, extremes]);
+
+            return <div ref={chartContainerRef} className="w-full h-64" />;
+        };
+
+        const FearGreedModal = ({ isOpen, onClose, data }) => {
+            const [timeRange, setTimeRange] = useState('1Y');
+            const scrollRef = useRef(null);
+
+            // Calculate Percentile
+            const percentile = useMemo(() => {
+                if (!data || data.length === 0) return 0;
+                const latest = data[data.length - 1].now;
+
+                // Filter data based on selected range for percentile calc
+                const now = new Date();
+                let cutoffDate = new Date(0);
+                if (timeRange === '1M') cutoffDate.setMonth(now.getMonth() - 1);
+                else if (timeRange === '1Y') cutoffDate.setFullYear(now.getFullYear() - 1);
+
+                const rangeData = data.filter(d => new Date(d.date) >= cutoffDate);
+                const countLower = rangeData.filter(d => d.now < latest).length;
+                return Math.round((countLower / rangeData.length) * 100);
+            }, [data, timeRange]);
+
+            // Handle ESC key to close
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (e.key === 'Escape' && isOpen) {
+                        onClose();
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [isOpen, onClose]);
+
+            if (!isOpen || !data || data.length === 0) return null;
+
+            const current = data[data.length - 1];
+            const prev = data[data.length - 2]; // Yesterday (actual trading day)
+            // API provides one_week_ago, one_month_ago in the item? 
+            // The JSON structure says item has { now, previous_close, one_week_ago, one_month_ago, one_year_ago }
+            // Let's use the current item's history fields if available
+
+            const history = [
+                { label: '昨天', val: current.previous_close },
+                { label: '上週', val: current.one_week_ago },
+                { label: '上月', val: current.one_month_ago },
+            ];
+
+            const status = getFGStatus(current.now);
+            const val = Math.round(current.now);
+            const prevVal = Math.round(current.previous_close);
+
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                    onClick={(e) => e.target === e.currentTarget && onClose()}>
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-800">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">恐懼與貪婪指數</h2>
+                            <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
+                                <CloseIcon />
+                            </button>
+                        </div>
+
+                        {/* Scrollable Content */}
+                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 scroll-lock-vertical">
+                            {/* Gauge Section */}
+                            <div className="flex flex-col items-center">
+                                <FearGreedGauge value={current.now} />
+                                <div className="flex items-baseline gap-2 -mt-6 z-10">
+                                    {val > prevVal && <span className="text-green-500 text-xl">▲</span>}
+                                    {val < prevVal && <span className="text-red-500 text-xl">▼</span>}
+                                    <span className={`text-5xl font-bold ${status.textClass}`}>{val}</span>
+                                </div>
+                                <div className={`text-xl font-bold mt-1 ${status.textClass}`}>{status.label}</div>
+                            </div>
+
+                            {/* History Grid */}
+                            <div className="grid grid-cols-3 gap-2">
+                                {history.map((h, i) => {
+                                    const hStatus = getFGStatus(h.val);
+                                    return (
+                                        <div key={i} className="flex flex-col items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400 mb-1">{h.label}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: hStatus.color }}></div>
+                                                <span className="text-lg font-bold dark:text-white font-mono">{Math.round(h.val)}</span>
+                                            </div>
+                                            <span className={`text-xs ${hStatus.textClass}`}>{hStatus.label}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Chart Controls */}
+                            <div className="flex justify-between items-center mt-2">
+                                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                                    {['1M', '1Y', 'All'].map(r => (
+                                        <button
+                                            key={r}
+                                            onClick={() => setTimeRange(r)}
+                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeRange === r
+                                                ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
+                                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                                }`}
+                                        >
+                                            {{ '1M': '近1月', '1Y': '近1年', 'All': '全部' }[r]}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Stats */}
+                            <div className="flex justify-between items-center px-2">
+                                <div>
+                                    <div className="text-xs text-gray-500">恐貪指數</div>
+                                    <div className={`font-bold ${status.textClass}`}>{status.label} {val}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500">指數百分位</div>
+                                    <div className="font-bold text-gray-900 dark:text-white font-mono">{percentile}%</div>
+                                </div>
+                            </div>
+
+                            {/* Chart */}
+                            <div className="bg-gray-50 dark:bg-gray-800/30 rounded-xl p-2 h-64 overflow-hidden border border-gray-100 dark:border-gray-800">
+                                <FearGreedChart data={data} timeRange={timeRange} />
+                            </div>
+
+                            <div className="text-[10px] text-gray-400 text-center">
+                                更新時間: {current.date}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const App = () => {
+
             // ========================================
             // App - 主應用程式元件
             // ----------------------------------------
@@ -2305,6 +2827,10 @@
             const [searchOpen, setSearchOpen] = useState(false);
             const [highlightedStock, setHighlightedStock] = useState(null);
             const [allStocksData, setAllStocksData] = useState({ US: [], HK: [] }); // 跨市場搜尋用
+
+            // Fear & Greed Index State
+            const [fearGreedData, setFearGreedData] = useState([]);
+            const [fearGreedModalOpen, setFearGreedModalOpen] = useState(false);
 
             // 股票詳情 Modal 狀態
             const [selectedStock, setSelectedStock] = useState(null);
@@ -2532,6 +3058,12 @@
                         setRawData(json.data.list);
                         // 同時更新 allStocksData 供搜尋使用
                         setAllStocksData(prev => ({ ...prev, [market]: json.data.list }));
+
+                        // Fetch Fear & Greed Data (Silent update)
+                        fetchFearGreedData().then(fgData => {
+                            if (fgData) setFearGreedData(fgData);
+                        });
+
                         setLoading(false); // Success
                         return; // Exit function on success
                     } else {
@@ -2655,6 +3187,16 @@
                 return sectorList.sort((a, b) => b.avgChange - a.avgChange);
             }, [rawData, timeRange]);
 
+            // Derived min/max values for scaling chart colors
+            const chartScale = useMemo(() => {
+                if (!fearGreedData || fearGreedData.length === 0) return { min: 0, max: 100 };
+                const values = fearGreedData.map(d => d.now);
+                return {
+                    min: Math.min(...values),
+                    max: Math.max(...values)
+                };
+            }, [fearGreedData]);
+
             // Sort logic for display (用於強勢/弱勢排行)
             const displaySectors = useMemo(() => {
                 // strong = 強勢排行（降序）, weak = 弱勢排行（升序）
@@ -2740,6 +3282,13 @@
 
             return (
                 <div className="flex flex-col h-full">
+                    {/* Fear & Greed Modal */}
+                    <FearGreedModal
+                        isOpen={fearGreedModalOpen}
+                        onClose={() => setFearGreedModalOpen(false)}
+                        data={fearGreedData}
+                    />
+
                     {/* Loading / Error Overlay */}
                     {loading && (
                         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -2772,8 +3321,18 @@
                             板塊
                         </h1>
 
-                        {/* Market Breadth Bar */}
-                        <MarketBreadth up={breadthStats.up} down={breadthStats.down} />
+                        <div className="flex flex-1 items-center justify-center sm:ml-4">
+                            <div className="flex items-center bg-gray-50/50 dark:bg-gray-800/50 rounded-xl p-1 gap-2 border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
+                                <FearGreedWidget
+                                    data={fearGreedData}
+                                    onClick={() => setFearGreedModalOpen(true)}
+                                />
+                                <div className="w-px h-6 bg-gray-200 dark:bg-gray-700"></div>
+                                <div className="flex-1 min-w-[120px]">
+                                    <MarketBreadth up={breadthStats.up} down={breadthStats.down} />
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="flex items-center gap-2 sm:gap-4">
                             {/* Search Button */}
