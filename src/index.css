@@ -1,0 +1,98 @@
+/* 引入 Tailwind CSS v4 */
+@import "tailwindcss";
+
+/* 啟用手動控制 dark mode（透過 .dark class） */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* === Tailwind 自訂設定 === */
+@theme {
+    --color-gray-750: #2d3748;
+    --color-gray-850: #1a202c;
+    --color-gray-950: #0d1117;
+    --color-quote-up: #06A870;
+    --color-quote-down: #F03A55;
+    --color-quote-neutral: #646F85;
+}
+
+/* === 自訂樣式 === */
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Body fixed to prevent pull-to-refresh on mobile and general scroll */
+body {
+    overscroll-behavior: none;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Hide scrollbar for horizontal scrolling areas but keep functionality */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* 單向滾動鎖定 - 防止手機斜向滑動 */
+.scroll-lock-vertical {
+    touch-action: pan-y;
+    overscroll-behavior-x: contain;
+}
+
+.scroll-lock-horizontal {
+    touch-action: pan-x;
+    overscroll-behavior-y: contain;
+}
+
+/* 雙向滾動容器 - 使用 contain 防止滾動穿透 */
+.scroll-container {
+    overscroll-behavior: contain;
+}
+
+/* 無障礙：尊重使用者的動態偏好設定 */
+@media (prefers-reduced-motion: reduce) {
+    .animate-spin {
+        animation: none;
+    }
+
+    .transition-all,
+    .transition-colors,
+    .transition-transform,
+    .transition-opacity {
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Screen Reader Only - 僅供螢幕閱讀器使用 */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}

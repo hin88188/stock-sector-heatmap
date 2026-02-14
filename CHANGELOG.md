@@ -2,6 +2,45 @@
 
 本文件記錄所有版本的更新內容。格式基於 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.0.0/)。
 
+## [v1.6.0] - 2026-02-15
+
+### 新增
+- 🔄 **架構重構：遷移至 Vite + React 專案結構**：
+  - 從單一 `sector_heatmap.html` 重構為現代化專案結構
+  - 新增 `package.json` 管理專案依賴
+  - 新增 `vite.config.js` 配置 Vite 建置工具
+  - 新增 `index.html` 作為 Vite 入口
+  - 新增 `src/` 目錄，包含 `main.jsx`、`App.jsx`、`index.css`
+  - 保留原始 `sector_heatmap.html` 作為備份
+- 🛠️ **開發工具整合**：
+  - 整合 **Agentation.dev** 作為開發工具（僅開發環境載入）
+  - 支援**熱模組替換 (HMR)**，修改程式碼後自動更新頁面
+  - 新增開發/正式環境區分機制（透過 `import.meta.env.DEV`）
+- 📦 **依賴管理現代化**：
+  - React 18 從 CDN 遷移至 npm (`react`, `react-dom`)
+  - Tailwind CSS 從 CDN 遷移至 npm (`tailwindcss`, `@tailwindcss/vite`)
+  - Lightweight Charts 從 CDN 遷移至 npm (`lightweight-charts`)
+  - Lucide Icons 從 CDN 遷移至 npm (`lucide-react`)
+  - 新增 `agentation` 作為 devDependency
+
+### 變更
+- ⚡ **建置流程升級**：
+  - 從瀏覽器端 Babel 即時轉譯改為 Vite 建置時轉譯（效能大幅提升）
+  - 從 CDN 載入改為 npm 套件管理（更穩定、可離線開發）
+  - 正式環境建置時自動排除 Agentation（減少 bundle 體積）
+- 📝 **文件更新**：
+  - 更新 README.md：新增開發環境安裝步驟與使用說明
+  - 更新檔案結構說明，反映新專案架構
+  - 更新技術架構說明，列出所有 npm 套件版本
+
+### 技術細節
+- 🔧 JSX 轉譯從 Babel Standalone 改為 Vite + @vitejs/plugin-react
+- 🔧 Tailwind CSS 整合透過 `@tailwindcss/vite` 插件
+- 🔧 Agentation 使用 `React.lazy` 與 `Suspense` 條件載入
+- 🔧 新增 npm scripts：`dev`、`build`、`preview`
+
+---
+
 ## [v1.5.6] - 2026-02-07
 
 ### 新增
