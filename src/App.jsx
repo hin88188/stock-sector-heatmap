@@ -1811,16 +1811,25 @@ const StockInfoGrid = ({ data, loading, className }) => {
 // ========================================
 const CHART_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
 const CHART_APIS = {
-    // 1D: 分時數據
+    // 1D: 分時數據（timeshares v5，獨立結構）
     '1D': (id) => `https://m-gl.lbkrs.com/api/forward/v5/quote/stock/timeshares?counter_id=${id}&trade_session=0`,
-    // 5D: 多日分時
+    // 5D: 多日分時（mutitimeshares，獨立結構）
     '5D': (id) => `https://m-gl.lbkrs.com/api/forward/quote/stock/mutitimeshares?counter_id=${id}&merge_minute=0`,
-    // 1M/3M/6M/1Y: K線 (line_type=1000 是日K)
-    '1M': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=24&line_type=1000`,
-    '3M': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=65&line_type=1000`,
-    '6M': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=130&line_type=1000`,
-    '1Y': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=260&line_type=1000`,
+    // K線：統一取 260 筆（1Y），前端切片產生 1M/3M/6M/1Y
+    'KLINE': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=260&line_type=1000`,
 };
+
+// K 線切片映射：從完整 260 筆數據的尾端取對應數量
+const KLINE_SLICE_MAP = { '1M': 24, '3M': 65, '6M': 130, '1Y': 260 };
+
+// 計算漲跌幅
+const calcChange = (points, baseline) => {
+    if (points.length > 0 && baseline != null) {
+        return (points[points.length - 1].value - baseline) / baseline;
+    }
+    return 0;
+};
+
 const DETAIL_API = (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/stock/detail?counter_id=${id}`;
 
 const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, processedSectors, globalMaxVal, timeRangeIdx, language }) => {
@@ -1862,97 +1871,97 @@ const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, proces
         if (!stock) return;
 
         const controller = new AbortController();
-        const ranges = ['1D', '5D', '1M', '3M', '6M', '1Y'];
 
+        // 共用的 proxy fetch 工具函數
+        const fetchWithProxy = async (apiUrl) => {
+            const url = CHART_PROXY + encodeURIComponent(apiUrl);
+            const res = await fetch(url, { signal: controller.signal });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        };
+
+        // 取得股票詳情
         const fetchDetailData = async () => {
-            if (controller.signal.aborted) return;
-            setDetailLoading(true);
-
             try {
                 const apiUrl = DETAIL_API(stock.counter_id) + `&locale=${language}`;
-                const url = CHART_PROXY + encodeURIComponent(apiUrl);
                 console.log(`[Detail] Fetching for ${stock.counter_id}:`, apiUrl);
-
-                const res = await fetch(url, { signal: controller.signal });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-                const json = await res.json();
+                const json = await fetchWithProxy(apiUrl);
                 console.log(`[Detail] Response:`, json);
-
                 const parsed = parseDetailData(json.data);
-                setDetailData(parsed);
+                if (!controller.signal.aborted) setDetailData(parsed);
             } catch (e) {
                 if (e.name !== 'AbortError') {
                     console.error(`[Detail] Failed to fetch detail:`, e);
                 }
             } finally {
-                if (!controller.signal.aborted) {
-                    setDetailLoading(false);
-                }
+                if (!controller.signal.aborted) setDetailLoading(false);
             }
         };
 
-        const fetchRangeData = async (range) => {
-            if (controller.signal.aborted) return;
-
+        // 並行取得所有圖表數據（3 個 API：1D + 5D + KLINE）
+        const fetchAllChartData = async () => {
             try {
-                const apiUrl = CHART_APIS[range](stock.counter_id);
-                const url = CHART_PROXY + encodeURIComponent(apiUrl);
-                console.log(`[Chart] Fetching ${range} for ${stock.counter_id}:`, apiUrl);
+                const [res1D, res5D, resKline] = await Promise.allSettled([
+                    fetchWithProxy(CHART_APIS['1D'](stock.counter_id)),
+                    fetchWithProxy(CHART_APIS['5D'](stock.counter_id)),
+                    fetchWithProxy(CHART_APIS['KLINE'](stock.counter_id)),
+                ]);
 
-                const res = await fetch(url, { signal: controller.signal });
-                if (!res.ok) {
-                    console.error(`[Chart] ${range} HTTP error:`, res.status);
-                    setError(`HTTP ${res.status}`);
-                    return;
+                if (controller.signal.aborted) return;
+
+                const newRangeData = {};
+
+                // 處理 1D 分時數據
+                if (res1D.status === 'fulfilled') {
+                    const { points, baseline } = parseChartData(res1D.value.data, '1D');
+                    newRangeData['1D'] = { data: points, baseline, change: calcChange(points, baseline) };
+                    console.log(`[Chart] 1D parsed: ${points.length} points, baseline=${baseline}`);
+                } else {
+                    console.error('[Chart] 1D fetch failed:', res1D.reason);
                 }
 
-                const json = await res.json();
-                console.log(`[Chart] ${range} raw response:`, json);
-
-                const { points, baseline } = parseChartData(json.data, range);
-                console.log(`[Chart] ${range} parsed: ${points.length} points, baseline=${baseline}`);
-
-                // 計算漲跌幅：使用 baseline 作為基準
-                let change = 0;
-                if (points.length > 0 && baseline != null) {
-                    const lastPrice = points[points.length - 1].value;
-                    change = (lastPrice - baseline) / baseline;
+                // 處理 5D 多日分時數據
+                if (res5D.status === 'fulfilled') {
+                    const { points, baseline } = parseChartData(res5D.value.data, '5D');
+                    newRangeData['5D'] = { data: points, baseline, change: calcChange(points, baseline) };
+                    console.log(`[Chart] 5D parsed: ${points.length} points, baseline=${baseline}`);
+                } else {
+                    console.error('[Chart] 5D fetch failed:', res5D.reason);
                 }
 
-                setRangeData(prev => ({ ...prev, [range]: { data: points, baseline, change } }));
+                // 處理 K 線數據：一次取 260 筆，切片產生 1M/3M/6M/1Y
+                if (resKline.status === 'fulfilled') {
+                    const fullKlines = resKline.value.data?.klines;
+                    if (Array.isArray(fullKlines) && fullKlines.length >= 2) {
+                        Object.entries(KLINE_SLICE_MAP).forEach(([range, sliceNum]) => {
+                            const sliced = fullKlines.slice(-sliceNum);
+                            const { points, baseline } = parseChartData({ klines: sliced }, range);
+                            newRangeData[range] = { data: points, baseline, change: calcChange(points, baseline) };
+                            console.log(`[Chart] ${range} parsed (sliced ${sliceNum}): ${points.length} points, baseline=${baseline}`);
+                        });
+                    }
+                } else {
+                    console.error('[Chart] KLINE fetch failed:', resKline.reason);
+                }
 
-                if (range === selectedRange && !controller.signal.aborted) {
-                    setChartData(points);
+                if (!controller.signal.aborted) {
+                    setRangeData(newRangeData);
                     setLoading(false);
                 }
             } catch (e) {
                 if (e.name !== 'AbortError') {
-                    console.error(`[Chart] Failed to fetch ${range}:`, e);
+                    console.error('[Chart] fetchAllChartData error:', e);
                     setError(e.message);
+                    setLoading(false);
                 }
             }
         };
 
-        // Fetch detail
+        // 並行發送 detail + chart 請求
         fetchDetailData();
+        fetchAllChartData();
 
-        // Fetch all ranges with staggered timing
-        ranges.forEach((range, index) => {
-            setTimeout(() => {
-                if (!controller.signal.aborted) fetchRangeData(range);
-            }, index * 150);
-        });
-
-        // Timeout fallback: if no data after 5s, stop loading
-        const timeoutId = setTimeout(() => {
-            setLoading(false);
-        }, 5000);
-
-        return () => {
-            controller.abort();
-            clearTimeout(timeoutId);
-        };
+        return () => controller.abort();
     }, [stock, language]);
 
     useEffect(() => {
