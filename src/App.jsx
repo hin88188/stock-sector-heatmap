@@ -1279,6 +1279,34 @@ const StockChart = ({ data, baseline, loading, stockName }) => {
         return { change, isPositive: change >= 0 };
     }, [baseline]);
 
+    // Tooltip 內容計算（使用 useMemo 避免狀態追蹤問題）
+    const tooltipContent = useMemo(() => {
+        if (!tooltipData || tooltipData.x == null) return null;
+        
+        const { change, isPositive } = getChangeInfo(tooltipData.price);
+        const { dateStr, timeStr } = formatTooltipTime(tooltipData.time);
+        
+        // Tooltip Position Logic (Smooth Clamping)
+        const TOOLTIP_WIDTH = 120;
+        const halfWidth = TOOLTIP_WIDTH / 2;
+        const containerW = tooltipData.containerWidth || 0;
+        const maxLeft = containerW - TOOLTIP_WIDTH;
+        const idealLeft = tooltipData.x - halfWidth;
+        const clampedLeft = Math.max(0, Math.min(idealLeft, maxLeft));
+        
+        return { 
+            price: tooltipData.price, 
+            time: tooltipData.time, 
+            x: tooltipData.x, 
+            y: tooltipData.y,
+            change, 
+            isPositive, 
+            dateStr, 
+            timeStr, 
+            clampedLeft 
+        };
+    }, [tooltipData, getChangeInfo]);
+
     // 初始化圖表
     useEffect(() => {
         if (!chartContainerRef.current) return;
@@ -1287,7 +1315,8 @@ const StockChart = ({ data, baseline, loading, stockName }) => {
         const chart = LightweightCharts.createChart(chartContainerRef.current, {
             layout: {
                 background: { type: 'solid', color: 'transparent' },
-                textColor: '#9CA3AF'
+                textColor: '#9CA3AF',
+                attributionLogo: false
             },
             grid: {
                 vertLines: { visible: false },
@@ -1568,60 +1597,46 @@ const StockChart = ({ data, baseline, loading, stockName }) => {
             <div ref={chartContainerRef} className="w-full h-full cursor-crosshair" />
 
             {/* Custom Tooltip Overlay (Fixed Top) */}
-            {tooltipData && (() => {
-                const { change, isPositive } = getChangeInfo(tooltipData.price);
-                const { dateStr, timeStr } = formatTooltipTime(tooltipData.time);
+            {tooltipContent && (
+                <>
+                    {/* Crosshair Dot */}
+                    <div
+                        className="absolute w-3 h-3 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)] border-2 border-blue-500 z-30 pointer-events-none"
+                        style={{
+                            left: tooltipContent.x,
+                            top: tooltipContent.y,
+                            transform: 'translate(-50%, -50%)'
+                        }}
+                    />
 
-                // Tooltip Position Logic (Smooth Clamping)
-                const TOOLTIP_WIDTH = 120;
-                const halfWidth = TOOLTIP_WIDTH / 2;
-                const containerW = tooltipData.containerWidth || 0;
-                const maxLeft = containerW - TOOLTIP_WIDTH;
-                const idealLeft = tooltipData.x - halfWidth;
-                const clampedLeft = Math.max(0, Math.min(idealLeft, maxLeft));
-
-                let tooltipStyle = {
-                    position: 'absolute',
-                    top: '12px',
-                    left: `${clampedLeft}px`,
-                    width: `${TOOLTIP_WIDTH}px`,
-                    pointerEvents: 'none',
-                    zIndex: 50,
-                };
-
-                return (
-                    <>
-                        {/* Crosshair Dot */}
-                        <div
-                            className="absolute w-3 h-3 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)] border-2 border-blue-500 z-30 pointer-events-none"
-                            style={{
-                                left: tooltipData.x,
-                                top: tooltipData.y,
-                                transform: 'translate(-50%, -50%)'
-                            }}
-                        />
-
-                        {/* Fixed Tooltip Box (Vertical Stack) */}
-                        <div
-                            className="absolute px-3 py-2 rounded-xl shadow-xl backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-gray-100 dark:border-gray-700 flex flex-col items-center min-w-[90px]"
-                            style={tooltipStyle}
-                        >
-                            {/* Date Time */}
-                            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono text-center leading-tight mb-1">
-                                {dateStr} <span className="opacity-75 ml-1">{timeStr}</span>
-                            </div>
-                            {/* Price */}
-                            <div className="text-xl font-bold text-gray-900 dark:text-white font-mono leading-none">
-                                {tooltipData.price?.toFixed(2)}
-                            </div>
-                            {/* Change */}
-                            <div className={`text-xs font-bold font-mono mt-0.5 ${isPositive ? 'text-quote-up' : 'text-quote-down'}`}>
-                                {formatPercent(change)}
-                            </div>
+                    {/* Fixed Tooltip Box (Vertical Stack) */}
+                    <div
+                        key={tooltipContent.time}
+                        className="absolute px-3 py-2 rounded-xl shadow-xl backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-gray-100 dark:border-gray-700 flex flex-col items-center min-w-[90px]"
+                        style={{
+                            position: 'absolute',
+                            top: '12px',
+                            left: `${tooltipContent.clampedLeft}px`,
+                            width: '120px',
+                            pointerEvents: 'none',
+                            zIndex: 50,
+                        }}
+                    >
+                        {/* Date Time */}
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono text-center leading-tight mb-1">
+                            {tooltipContent.dateStr} <span className="opacity-75 ml-1">{tooltipContent.timeStr}</span>
                         </div>
-                    </>
-                );
-            })()}
+                        {/* Price */}
+                        <div className="text-xl font-bold text-gray-900 dark:text-white font-mono leading-none">
+                            {tooltipContent.price?.toFixed(2)}
+                        </div>
+                        {/* Change */}
+                        <div className={`text-xs font-bold font-mono mt-0.5 ${tooltipContent.isPositive ? 'text-quote-up' : 'text-quote-down'}`}>
+                            {formatPercent(tooltipContent.change)}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

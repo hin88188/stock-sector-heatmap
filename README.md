@@ -1,6 +1,6 @@
 # Stock Sector Heatmap (板塊強弱勢排行)
 
-![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.6.2-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 一個基於 Web 的即時股市板塊熱力圖工具，專為分析美股 (US) 與港股 (HK) 的板塊強弱勢而設計。透過視覺化的方式，快速掌握市場資金流向與板塊輪動。
@@ -128,10 +128,9 @@ stock-sector-heatmap/
 
 ## 📝 版本紀錄
 
-**最新版本: v1.6.1** (2026-02-15)
-- ⚡ 效能優化：API 請求量減少 50%，並行載入 K 線圖表
-- 🔄 數據優化：改進 K 線數據切片演算法
-- 🛠️ 穩定性：修正部分圖表載入問題
+**最新版本: v1.6.2** (2026-02-16)
+- 🐛 修復：移除 Lightweight Charts 品牌標識
+- 🐛 修復：解決 Tooltip 價格在手機瀏覽器上不更新的問題
 
 👉 [查看完整更新日誌](CHANGELOG.md)
 

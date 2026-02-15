@@ -2,6 +2,17 @@
 
 本文件記錄所有版本的更新內容。格式基於 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.0.0/)。
 
+## [v1.6.2] - 2026-02-16
+
+### 修復
+- 🐛 **移除 Lightweight Charts 品牌標識**：
+  - 在圖表配置中添加 `attributionLogo: false`，移除右下角的 TradingView logo。
+- 🐛 **修復 Tooltip 價格更新問題**：
+  - 使用 `useMemo` 替代 JSX 中的 IIFE，解決 React 狀態追蹤問題。
+  - 在 Tooltip Box 添加 `key` 屬性，解決手機瀏覽器 DOM 緩存導致價格不更新的問題。
+
+---
+
 ## [v1.6.1] - 2026-02-15
 
 ### 優化
