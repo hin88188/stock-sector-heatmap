@@ -357,13 +357,13 @@ const MarketBreadth = memo(({ up, down, onClick }) => {
     if (total === 0) return null;
 
     return (
-        <div
+        <button
             onClick={onClick}
             className={`
                 flex flex-col gap-1 w-24 sm:w-32 md:w-40 lg:w-48
-                cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-700/50
-                rounded-lg p-1.5 transition-colors duration-200
-                ${onClick ? '' : ''}
+                bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700
+                rounded-lg border border-gray-200 dark:border-gray-700
+                p-1.5 transition-colors duration-200 group
             `}
         >
             <div className="flex items-center justify-between text-xs">
@@ -382,7 +382,7 @@ const MarketBreadth = memo(({ up, down, onClick }) => {
                     className="bg-green-500 dark:bg-green-500 h-full transition-all duration-500"
                 />
             </div>
-        </div>
+        </button>
     );
 });
 
@@ -2411,7 +2411,7 @@ const FearGreedChart = ({ data, timeRange }) => {
         if (!chartContainerRef.current) return;
 
         const chart = LightweightCharts.createChart(chartContainerRef.current, {
-            layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#9CA3AF' },
+            layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#9CA3AF', attributionLogo: false },
             grid: { vertLines: { visible: false }, horzLines: { color: 'rgba(42, 46, 57, 0.1)' } },
             rightPriceScale: {
                 borderVisible: false,
@@ -2441,12 +2441,32 @@ const FearGreedChart = ({ data, timeRange }) => {
             },
         });
 
-        // Custom price scale to fix -20 to 120
+        // 自訂價格刻度：顯示 0/20/40/60/80/100
         chart.priceScale('right').applyOptions({
             autoScale: false,
-            minValue: -20,
-            maxValue: 120,
+            minValue: -10,
+            maxValue: 110,
             scaleMargins: { top: 0.02, bottom: 0.02 },
+        });
+
+        // 動態更新 Y 軸 crosshair 標示顏色（根據數值對應區間顏色）
+        chart.subscribeCrosshairMove((param) => {
+            if (param.seriesData && param.seriesData.size > 0) {
+                let value = null;
+                param.seriesData.forEach((data) => {
+                    if (data.value !== undefined) value = data.value;
+                });
+                if (value !== null) {
+                    const color = getColor(value);
+                    chart.applyOptions({
+                        crosshair: {
+                            horzLine: {
+                                labelBackgroundColor: color,
+                            }
+                        }
+                    });
+                }
+            }
         });
 
         chartRef.current = chart;
@@ -2495,7 +2515,7 @@ const FearGreedChart = ({ data, timeRange }) => {
                 lastValueVisible: false,
                 priceLineVisible: false,
                 autoscaleInfoProvider: () => ({
-                    priceRange: { minValue: -20, maxValue: 120 },
+                    priceRange: { minValue: -10, maxValue: 110 },
                 }),
             });
             series.setData(segment.data);
@@ -2620,32 +2640,32 @@ const FearGreedModal = ({ isOpen, onClose, data }) => {
 
                 {/* Scrollable Content */}
                 <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 scroll-lock-vertical">
-                    {/* Gauge Section */}
-                    <div className="flex flex-col items-center">
-                        <FearGreedGauge value={current.now} />
-                        <div className="flex items-baseline gap-2 -mt-6 z-10">
-                            {val > prevVal && <span className="text-green-500 text-xl">▲</span>}
-                            {val < prevVal && <span className="text-red-500 text-xl">▼</span>}
-                            <span className={`text-5xl font-bold ${status.textClass}`}>{val}</span>
+                    {/* Gauge + History 並排區域 */}
+                    <div className="flex items-center gap-3">
+                        {/* 左側：Gauge 儀表板 */}
+                        <div className="flex-1 flex flex-col items-center min-w-0">
+                            <FearGreedGauge value={current.now} />
+                            <div className="flex items-baseline gap-2 -mt-16 z-10">
+                                {val > prevVal && <span className="text-green-500 text-xl">▲</span>}
+                                {val < prevVal && <span className="text-red-500 text-xl">▼</span>}
+                                <span className={`text-5xl font-bold ${status.textClass}`}>{val}</span>
+                            </div>
+                            <div className={`text-xl font-bold ${status.textClass}`}>{status.label}</div>
                         </div>
-                        <div className={`text-xl font-bold mt-1 ${status.textClass}`}>{status.label}</div>
-                    </div>
-
-                    {/* History Grid */}
-                    <div className="grid grid-cols-3 gap-2">
-                        {history.map((h, i) => {
-                            const hStatus = getFGStatus(h.val);
-                            return (
-                                <div key={i} className="flex flex-col items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 mb-1">{h.label}</span>
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: hStatus.color }}></div>
-                                        <span className="text-lg font-bold dark:text-white font-mono">{Math.round(h.val)}</span>
+                        {/* 右側：歷史數據垂直列表 */}
+                        <div className="flex flex-col gap-2 shrink-0">
+                            {history.map((h, i) => {
+                                const hStatus = getFGStatus(h.val);
+                                return (
+                                    <div key={i} className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                                        <span className="text-xs text-gray-500 dark:text-gray-400 w-7">{h.label}</span>
+                                        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: hStatus.color }}></div>
+                                        <span className="text-sm font-bold dark:text-white font-mono">{Math.round(h.val)}</span>
+                                        <span className={`text-xs ${hStatus.textClass}`}>{hStatus.label}</span>
                                     </div>
-                                    <span className={`text-xs ${hStatus.textClass}`}>{hStatus.label}</span>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {/* Chart Controls */}
