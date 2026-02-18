@@ -349,7 +349,7 @@ const SectorListSkeleton = ({ count = 8 }) => (
     </div>
 );
 
-const MarketBreadth = memo(({ up, down }) => {
+const MarketBreadth = memo(({ up, down, onClick }) => {
     const total = up + down;
     const downPct = total > 0 ? (down / total) * 100 : 0;
     const upPct = total > 0 ? (up / total) * 100 : 0;
@@ -357,19 +357,31 @@ const MarketBreadth = memo(({ up, down }) => {
     if (total === 0) return null;
 
     return (
-        <div className="flex items-center gap-1.5 flex-1 max-w-[200px] mx-2 sm:mx-4">
-            <span className="text-xs font-bold text-red-500 dark:text-red-400 w-8 text-right">{down}</span>
-            <div className="flex-1 h-2.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden relative flex">
-                {/* Center Marker */}
-                <div className="absolute left-1/2 top-0 bottom-0 w-0 border-l-[1.5px] border-dashed border-black/60 z-10 transform -translate-x-1/2"></div>
-
-                {/* Down Bar (Left) */}
-                <div style={{ width: `${downPct}%` }} className="bg-red-500 dark:bg-red-500 h-full transition-all duration-500" />
-
-                {/* Up Bar (Right) */}
-                <div style={{ width: `${upPct}%` }} className="bg-green-500 dark:bg-green-500 h-full transition-all duration-500" />
+        <div
+            onClick={onClick}
+            className={`
+                flex flex-col gap-1 w-24 sm:w-32 md:w-40 lg:w-48
+                cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-700/50
+                rounded-lg p-1.5 transition-colors duration-200
+                ${onClick ? '' : ''}
+            `}
+        >
+            <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-red-500 dark:text-red-400">{down}</span>
+                <span className="font-bold text-green-500 dark:text-green-400">{up}</span>
             </div>
-            <span className="text-xs font-bold text-green-500 dark:text-green-400 w-8 text-left">{up}</span>
+
+            <div className="relative h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden flex">
+                <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed border-gray-400 dark:border-gray-500 z-10 transform -translate-x-1/2" />
+                <div
+                    style={{ width: `${downPct}%` }}
+                    className="bg-red-500 dark:bg-red-500 h-full transition-all duration-500"
+                />
+                <div
+                    style={{ width: `${upPct}%` }}
+                    className="bg-green-500 dark:bg-green-500 h-full transition-all duration-500"
+                />
+            </div>
         </div>
     );
 });
@@ -1282,10 +1294,10 @@ const StockChart = ({ data, baseline, loading, stockName }) => {
     // Tooltip 內容計算（使用 useMemo 避免狀態追蹤問題）
     const tooltipContent = useMemo(() => {
         if (!tooltipData || tooltipData.x == null) return null;
-        
+
         const { change, isPositive } = getChangeInfo(tooltipData.price);
         const { dateStr, timeStr } = formatTooltipTime(tooltipData.time);
-        
+
         // Tooltip Position Logic (Smooth Clamping)
         const TOOLTIP_WIDTH = 120;
         const halfWidth = TOOLTIP_WIDTH / 2;
@@ -1293,17 +1305,17 @@ const StockChart = ({ data, baseline, loading, stockName }) => {
         const maxLeft = containerW - TOOLTIP_WIDTH;
         const idealLeft = tooltipData.x - halfWidth;
         const clampedLeft = Math.max(0, Math.min(idealLeft, maxLeft));
-        
-        return { 
-            price: tooltipData.price, 
-            time: tooltipData.time, 
-            x: tooltipData.x, 
+
+        return {
+            price: tooltipData.price,
+            time: tooltipData.time,
+            x: tooltipData.x,
             y: tooltipData.y,
-            change, 
-            isPositive, 
-            dateStr, 
-            timeStr, 
-            clampedLeft 
+            change,
+            isPositive,
+            dateStr,
+            timeStr,
+            clampedLeft
         };
     }, [tooltipData, getChangeInfo]);
 
@@ -2220,7 +2232,7 @@ const FearGreedWidget = ({ data, onClick }) => {
     return (
         <button
             onClick={onClick}
-            className="flex items-center justify-center bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors group mr-2 sm:mr-4 px-2 py-1"
+            className="flex items-center justify-center bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors group px-2 py-1"
             title={`恐貪指數: ${status.label} (${val})`}
         >
             <div className="relative w-[44px] h-[24px] flex items-end justify-center">
@@ -2680,6 +2692,154 @@ const FearGreedModal = ({ isOpen, onClose, data }) => {
     );
 };
 
+// Market Breadth Modal - 市場寬度詳細資訊
+const MarketBreadthModal = ({ isOpen, onClose, data }) => {
+    // ESC 鍵關閉
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && isOpen) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
+    if (!isOpen || !data) return null;
+
+    const { up, down, flat, total, distribution } = data;
+
+    // 級距標籤
+    const labels = ['<-7%', '-7~-5%', '-5~-3%', '-3~0%', '0%', '0~+3%', '+3~+5%', '+5~+7%', '>+7%'];
+
+    // 計算百分比
+    const getPercentage = (value) => total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+
+    // 判斷級距顏色（根據漲跌）
+    const getBarColor = (index) => {
+        if (index <= 3) return 'bg-red-500'; // 下跌
+        if (index === 4) return 'bg-gray-400'; // 持平
+        return 'bg-green-500'; // 上漲
+    };
+
+    const getTextColor = (index) => {
+        if (index <= 3) return 'text-red-500';
+        if (index === 4) return 'text-gray-500';
+        return 'text-green-500';
+    };
+
+    // 找出最大值用於縮放長條圖
+    const maxCount = Math.max(...distribution);
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh]">
+                {/* Header */}
+                <div className="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-800">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">漲跌分佈</h2>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
+                        <CloseIcon />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    {/* 總結進度條 */}
+                    <div className="space-y-3">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">市場概況</span>
+                            <span className="text-gray-900 dark:text-gray-100 font-medium">{(up + down + flat).toLocaleString()} 檔股票</span>
+                        </div>
+                        {/* 三色進度條 */}
+                        <div className="h-4 flex rounded-full overflow-hidden">
+                            {down > 0 && (
+                                <div
+                                    className="bg-red-500 flex items-center justify-center text-[10px] text-white font-medium"
+                                    style={{ width: `${(down / total) * 100}%` }}
+                                >
+                                    {((down / total) * 100) >= 8 && down}
+                                </div>
+                            )}
+                            {flat > 0 && (
+                                <div
+                                    className="bg-gray-400 flex items-center justify-center text-[10px] text-white font-medium"
+                                    style={{ width: `${(flat / total) * 100}%` }}
+                                >
+                                    {((flat / total) * 100) >= 8 && flat}
+                                </div>
+                            )}
+                            {up > 0 && (
+                                <div
+                                    className="bg-green-500 flex items-center justify-center text-[10px] text-white font-medium"
+                                    style={{ width: `${(up / total) * 100}%` }}
+                                >
+                                    {((up / total) * 100) >= 8 && up}
+                                </div>
+                            )}
+                        </div>
+                        {/* 圖例 */}
+                        <div className="flex justify-between text-xs">
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                <span className="text-red-500 font-medium">下跌 {down}</span>
+                                <span className="text-gray-400">({getPercentage(down)}%)</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                                <span className="text-gray-500 font-medium">持平 {flat}</span>
+                                <span className="text-gray-400">({getPercentage(flat)}%)</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                <span className="text-green-500 font-medium">上漲 {up}</span>
+                                <span className="text-gray-400">({getPercentage(up)}%)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 分隔線 */}
+                    <div className="border-t border-gray-200 dark:border-gray-700"></div>
+
+                    {/* 9級距直方圖 */}
+                    <div className="space-y-3">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">漲跌幅級距分佈</div>
+                        <div className="space-y-2">
+                            {distribution.map((count, index) => {
+                                const percentage = getPercentage(count);
+                                const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
+
+                                return (
+                                    <div key={index} className="flex items-center gap-3">
+                                        {/* 標籤 */}
+                                        <div className={`w-16 text-xs font-medium ${getTextColor(index)}`}>
+                                            {labels[index]}
+                                        </div>
+                                        {/* 長條圖 */}
+                                        <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden relative">
+                                            <div
+                                                className={`h-full ${getBarColor(index)} transition-all duration-500 ease-out`}
+                                                style={{ width: `${barWidth}%` }}
+                                            ></div>
+                                        </div>
+                                        {/* 數值 */}
+                                        <div className="w-16 text-right">
+                                            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{count}</span>
+                                            <span className="text-[10px] text-gray-400 ml-1">({percentage}%)</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const App = () => {
 
     // ========================================
@@ -2721,6 +2881,7 @@ const App = () => {
     // Fear & Greed Index State
     const [fearGreedData, setFearGreedData] = useState([]);
     const [fearGreedModalOpen, setFearGreedModalOpen] = useState(false);
+    const [marketBreadthModalOpen, setMarketBreadthModalOpen] = useState(false);
 
     // 股票詳情 Modal 狀態
     const [selectedStock, setSelectedStock] = useState(null);
@@ -3104,16 +3265,61 @@ const App = () => {
 
     // Calculate Market Breadth (Up/Down counts)
     const breadthStats = useMemo(() => {
+        // 級距閾值常量（百分比）
+        const THRESHOLDS = {
+            FLAT: 0.01,      // 持平閾值: |漲跌幅| < 0.01%
+            LEVEL_3: 3,      // 3% 級距
+            LEVEL_5: 5,      // 5% 級距
+            LEVEL_7: 7       // 7% 級距
+        };
+
         let up = 0;
         let down = 0;
+        let flat = 0;
+        const distribution = new Array(9).fill(0);
+
         rawData.forEach(stock => {
             const val = parseFloat(stock.indicators[timeRange.idx]);
             if (!isNaN(val)) {
-                if (val > 0) up++;
-                else if (val < 0) down++;
+                // 將小數轉換為百分比
+                const pct = val * 100;
+                const absPct = Math.abs(pct);
+
+                // 計算 up/down（保持現有邏輯向後相容）
+                if (pct > 0) up++;
+                else if (pct < 0) down++;
+
+                // 計算 flat（漲跌幅絕對值 < 0.01%）
+                if (absPct < THRESHOLDS.FLAT) {
+                    flat++;
+                }
+
+                // 計算級距分佈
+                if (pct < -THRESHOLDS.LEVEL_7) {
+                    distribution[0]++; // <-7%
+                } else if (pct < -THRESHOLDS.LEVEL_5) {
+                    distribution[1]++; // -7% ~ -5%
+                } else if (pct < -THRESHOLDS.LEVEL_3) {
+                    distribution[2]++; // -5% ~ -3%
+                } else if (pct < -THRESHOLDS.FLAT) {
+                    distribution[3]++; // -3% ~ 0%
+                } else if (absPct < THRESHOLDS.FLAT) {
+                    distribution[4]++; // 0%（持平）
+                } else if (pct < THRESHOLDS.LEVEL_3) {
+                    distribution[5]++; // 0% ~ +3%
+                } else if (pct < THRESHOLDS.LEVEL_5) {
+                    distribution[6]++; // +3% ~ +5%
+                } else if (pct < THRESHOLDS.LEVEL_7) {
+                    distribution[7]++; // +5% ~ +7%
+                } else {
+                    distribution[8]++; // >+7%
+                }
             }
         });
-        return { up, down };
+
+        const total = up + down;
+
+        return { up, down, flat, total, distribution };
     }, [rawData, timeRange]);
 
     // 計算各板塊的市值加權平均漲跌幅 (用於 RS 計算)
@@ -3179,6 +3385,13 @@ const App = () => {
                 data={fearGreedData}
             />
 
+            {/* Market Breadth Modal */}
+            <MarketBreadthModal
+                isOpen={marketBreadthModalOpen}
+                onClose={() => setMarketBreadthModalOpen(false)}
+                data={breadthStats}
+            />
+
             {/* Loading / Error Overlay */}
             {loading && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -3212,15 +3425,23 @@ const App = () => {
                 </h1>
 
                 <div className="flex flex-1 items-center justify-center sm:ml-4">
-                    <div className="flex items-center bg-gray-50/50 dark:bg-gray-800/50 rounded-xl p-1 gap-2 border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
+                    <div className="flex items-center justify-center bg-gray-50/50 dark:bg-gray-800/50 rounded-xl p-1 gap-2 border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
                         <FearGreedWidget
                             data={fearGreedData}
                             onClick={() => setFearGreedModalOpen(true)}
                         />
-                        <div className="w-px h-6 bg-gray-200 dark:bg-gray-700"></div>
-                        <div className="flex-1 min-w-[120px]">
-                            <MarketBreadth up={breadthStats.up} down={breadthStats.down} />
-                        </div>
+                        {breadthStats.total > 0 && (
+                            <>
+                                <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden min-[360px]:block"></div>
+                                <div className="hidden min-[360px]:block">
+                                    <MarketBreadth
+                                        up={breadthStats.up}
+                                        down={breadthStats.down}
+                                        onClick={() => setMarketBreadthModalOpen(true)}
+                                    />
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
