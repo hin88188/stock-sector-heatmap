@@ -2892,11 +2892,18 @@ const App = () => {
     const [rawData, setRawData] = useState([]);
     const [barsVisible, setBarsVisible] = useState(true); // 標題欄/導航欄可見性
     const [showScrollTop, setShowScrollTop] = useState(false); // 回到頂部按鈕顯示狀態
+    // 背景刷新狀態：有緩存時 loading=false，用 isRefreshing 表示背景圖示完成
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // 搜尋相關狀態
     const [searchOpen, setSearchOpen] = useState(false);
     const [highlightedStock, setHighlightedStock] = useState(null);
     const [allStocksData, setAllStocksData] = useState({ US: [], HK: [] }); // 跨市場搜尋用
+
+    // Race condition guard：每次 fetchData 呼叫遞增，完成時若 ID 不符則丟棄
+    const fetchIdRef = useRef(0);
+    // 預載另一市場的 race condition guard
+    const fetchOtherMarketIdRef = useRef(0);
 
     // Fear & Greed Index State
     const [fearGreedData, setFearGreedData] = useState([]);
@@ -2942,6 +2949,10 @@ const App = () => {
         setMarket('US');            // 預設美股
         setViewMode('turnover');    // 預設成交排行
         setTimeRange(TIME_RANGES[0]); // 預設 1D
+
+        // 清除所有資料緩存（stockdata_ 前綴），下次重整強制重新抓取
+        const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith('stockdata_'));
+        keysToRemove.forEach(k => localStorage.removeItem(k));
     };
 
     // 讀取暗黑模式設定
@@ -3105,64 +3116,159 @@ const App = () => {
         }
     }, [selectedSector]);
 
-    const fetchData = async () => {
-        setLoading(true);
-        setError(null);
+    // ========================================
+    // 效能優化：資料緩存 key 工廠
+    // ----------------------------------------
+    // 格式：stockdata_<market>_<language>
+    // TTL：5 分鐘（避免過時資料過久佔用）
+    // ========================================
+    const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分鐘
+    const getCacheKey = (mkt, lang) => `stockdata_${mkt}_${lang}`;
+    const getFGCacheKey = () => 'stockdata_feargreed';
 
-        // 簡化為只用 codetabs proxy
+    // 讀取緩存，過期則返回 null
+    const readCache = (key) => {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            const { ts, data } = JSON.parse(raw);
+            if (Date.now() - ts > CACHE_TTL_MS) return null;
+            return data;
+        } catch {
+            return null;
+        }
+    };
+
+    // 寫入緩存
+    const writeCache = (key, data) => {
+        try {
+            localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+        } catch (e) {
+            // localStorage 可能已滿，忽略錯誤
+            console.warn('writeCache failed:', e);
+        }
+    };
+
+    const fetchData = async () => {
+        setError(null);
+        setIsRefreshing(true); // 請求開始，不管有沒有緩存都旋轉
+
+        // Race condition guard：記錄本次請求 ID，fetch 完成時若已被新請求取代則丟棄
+        const thisId = ++fetchIdRef.current;
+
+        // 方案 A：先從 localStorage 讀取緩存，立即顯示舊資料
+        const cacheKey = getCacheKey(market, language);
+        const cached = readCache(cacheKey);
+        // F&G 緩存也在此時立即讀取並套用，不等主資料 fetch
+        const fgCached = readCache(getFGCacheKey());
+        if (fetchIdRef.current === thisId) {
+            if (cached) {
+                setRawData(cached);
+                setAllStocksData(prev => ({ ...prev, [market]: cached }));
+                setLoading(false);
+            } else {
+                setLoading(true);
+            }
+            // F&G 有緩存就立即顯示，不必等主資料
+            if (fgCached) setFearGreedData(fgCached);
+        }
+
         const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
 
         try {
-            // Using CORS Proxy with cache-busting timestamp
             const targetUrl = MARKETS[market].url + '&_t=' + Date.now() + '&locale=' + language;
             const proxyUrl = PROXY + encodeURIComponent(targetUrl);
 
-            const res = await fetch(proxyUrl, {
-                cache: 'no-store'
-            });
+            // 方案 B：並行呼叫主資料 API 與 Fear & Greed API（F&G 有緩存則跳過網路）
+            const [res] = await Promise.all([
+                fetch(proxyUrl, { cache: 'no-store' }),
+                fgCached
+                    ? Promise.resolve(null)
+                    : fetchFearGreedData().then(fgData => {
+                        if (fgData) {
+                            setFearGreedData(fgData);
+                            writeCache(getFGCacheKey(), fgData);
+                        }
+                    })
+            ]);
+
+            // fetch 完成後，檢查是否仍是最新的請求，若已過期則丟棄
+            if (fetchIdRef.current !== thisId) return;
+
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
             const json = await res.json();
 
-            // Handle nested data structure: response.data.list
             if (json.data && Array.isArray(json.data.list)) {
-                setRawData(json.data.list);
-                // 同時更新 allStocksData 供搜尋使用
-                setAllStocksData(prev => ({ ...prev, [market]: json.data.list }));
+                const list = json.data.list;
+                setRawData(list);
+                setAllStocksData(prev => ({ ...prev, [market]: list }));
 
-                // Fetch Fear & Greed Data (Silent update)
-                fetchFearGreedData().then(fgData => {
-                    if (fgData) setFearGreedData(fgData);
-                });
+                // 方案 A：寫入緩存供下次使用
+                writeCache(cacheKey, list);
 
-                setLoading(false); // Success
-                return; // Exit function on success
+                setLoading(false);
+
+                // 刷新完成：結束動畫
+                setIsRefreshing(false);
+
+                // 方案 C：主資料完成後，延遲 3 秒再預載另一市場（避免競爭頻寬）
+                const otherMarket = market === 'US' ? 'HK' : 'US';
+                if (allStocksData[otherMarket].length === 0) {
+                    setTimeout(() => fetchOtherMarketData(otherMarket), 3000);
+                }
+
+                return;
             } else {
                 throw new Error('Invalid API response structure');
             }
         } catch (err) {
+            // 若已被新請求取代，靜默丟棄
+            if (fetchIdRef.current !== thisId) return;
+
             console.error("Fetch failed:", err);
-            setError(err ? err.message : "Failed to fetch data");
+            // 若有緩存舊資料，不顯示錯誤（靜默降級）
+            if (!cached) {
+                setError(err ? err.message : 'Failed to fetch data');
+            }
             setLoading(false);
+            setIsRefreshing(false); // 失敗時也要結束動畫
         }
     };
 
-    // 初始載入時，預先載入另一個市場的資料供搜尋使用
+    // 預載另一市場資料（含緩存）
     const fetchOtherMarketData = async (otherMarket) => {
+        // Race condition guard
+        const thisId = ++fetchOtherMarketIdRef.current;
+
+        // 方案 A：先嘗試緩存
+        const cacheKey = getCacheKey(otherMarket, language);
+        const cached = readCache(cacheKey);
+        if (cached) {
+            if (fetchOtherMarketIdRef.current === thisId) {
+                setAllStocksData(prev => ({ ...prev, [otherMarket]: cached }));
+            }
+            return;
+        }
+
         const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
 
         try {
             const targetUrl = MARKETS[otherMarket].url + '&_t=' + Date.now() + '&locale=' + language;
             const proxyUrl = PROXY + encodeURIComponent(targetUrl);
 
-            const res = await fetch(proxyUrl, {
-                cache: 'no-store'
-            });
+            const res = await fetch(proxyUrl, { cache: 'no-store' });
             if (!res.ok) return;
 
             const json = await res.json();
             if (json.data && Array.isArray(json.data.list)) {
-                setAllStocksData(prev => ({ ...prev, [otherMarket]: json.data.list }));
+                const list = json.data.list;
+                // fetch 完成後再次檢查是否仍是最新請求
+                if (fetchOtherMarketIdRef.current === thisId) {
+                    setAllStocksData(prev => ({ ...prev, [otherMarket]: list }));
+                    // 方案 A：同樣寫入緩存
+                    writeCache(cacheKey, list);
+                }
             }
         } catch (err) {
             console.warn(`Prefetch ${otherMarket} failed:`, err);
@@ -3187,14 +3293,8 @@ const App = () => {
             setHighlightedStock(null);
         }, 3000);
     }, [market]);
-
-    // 初始化時預載另一個市場的資料
-    useEffect(() => {
-        const otherMarket = market === 'US' ? 'HK' : 'US';
-        if (allStocksData[otherMarket].length === 0) {
-            fetchOtherMarketData(otherMarket);
-        }
-    }, [market]);
+    // 方案 C：移除啟動時立即預載另一市場的 useEffect
+    // 改為在 fetchData 成功後延遲 3s 觸發（見上方 fetchData 實作）
 
     // Process Data: Group and Calculate
     const processedSectors = useMemo(() => {
@@ -3479,12 +3579,12 @@ const App = () => {
                     {/* Refresh Button */}
                     <button
                         onClick={fetchData}
-                        disabled={loading}
+                        disabled={isRefreshing}
                         className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         title="重新整理"
                         aria-label="重新整理"
                     >
-                        <div className={loading ? "animate-spin" : ""} aria-hidden="true">
+                        <div className={isRefreshing ? "animate-spin" : "transition-transform hover:rotate-180 duration-300"} aria-hidden="true">
                             <RefreshIcon />
                         </div>
                     </button>
