@@ -867,12 +867,91 @@ const SearchModal = ({ isOpen, onClose, allStocksData, onSelectStock, currentMar
 };
 
 // ========================================
+// 52 週區間顏色工具函數
+// ----------------------------------------
+// 恐貪指數漸層色：0% 紅 → 50% 黃 → 100% 綠
+// 供 WeekRange52Card 和 WeekRangeRing 共用
+// ========================================
+const getGaugeColor = (pct) => {
+    if (pct <= 50) {
+        // 紅 (0,80,60) → 黃 (45,90,55)
+        const t = pct / 50;
+        const h = Math.round(0 + t * 45);
+        const s = Math.round(80 + t * 10);
+        const l = Math.round(50 + t * 8);
+        return `hsl(${h}, ${s}%, ${l}%)`;
+    } else {
+        // 黃 (45,90,55) → 綠 (140,70,42)
+        const t = (pct - 50) / 50;
+        const h = Math.round(45 + t * 95);
+        const s = Math.round(90 - t * 20);
+        const l = Math.round(58 - t * 16);
+        return `hsl(${h}, ${s}%, ${l}%)`;
+    }
+};
+
+// ========================================
+// WeekRangeRing - 52 週區間圓形進度環
+// ----------------------------------------
+// 20×20px SVG 圓環，中央顯示排名編號
+// 顏色與 WeekRange52Card 一致（紅→黃→綠）
+// ========================================
+const WeekRangeRing = memo(({ rank, percent, size: propSize }) => {
+    const clampedPercent = Math.max(0, Math.min(100, percent));
+    const color = getGaugeColor(clampedPercent);
+
+    // SVG 圓環參數
+    const size = propSize || 22;
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = (size - 4) / 2; // 半徑：留出 strokeWidth 的空間
+    const strokeWidth = 2.5;
+    const circumference = 2 * Math.PI * r;
+    const dashOffset = circumference * (1 - clampedPercent / 100);
+    const fontSize = rank > 999 ? size * 0.32 : rank > 99 ? size * 0.36 : size * 0.41;
+
+    return (
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
+            {/* 灰色底圓 */}
+            <circle
+                cx={cx} cy={cy} r={r}
+                fill="none"
+                stroke="currentColor"
+                className="text-gray-200 dark:text-gray-700"
+                strokeWidth={strokeWidth}
+            />
+            {/* 彩色進度弧 */}
+            <circle
+                cx={cx} cy={cy} r={r}
+                fill="none"
+                stroke={color}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+                transform={`rotate(-90 ${cx} ${cy})`}
+            />
+            {/* 中央編號 */}
+            <text
+                x={cx} y={cy}
+                textAnchor="middle"
+                dominantBaseline="central"
+                className="fill-gray-600 dark:fill-gray-300"
+                style={{ fontSize: `${fontSize}px`, fontWeight: 600, fontFamily: 'ui-monospace, monospace' }}
+            >
+                {rank}
+            </text>
+        </svg>
+    );
+});
+
+// ========================================
 // TurnoverList (Virtual Scrolling)
 // ----------------------------------------
 // 成交排行列表元件，使用虛擬滾動技術
 // 只渲染可視區域的元素，支援 2000+ 筆資料流暢滾動
 // ========================================
-const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onStockClick, onScroll, barsVisible, highlightedStockCode, fontSizePercent = 100, headerHeight = 40 }) => {
+const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxVal, timeRangeIdx, onMiniSectorClick, onStockClick, onScroll, barsVisible, highlightedStockCode, fontSizePercent = 100, headerHeight = 40, weekRange52Cache, onVisibleStocksChange }) => {
     // 虛擬滾動核心變數
     const ROW_HEIGHT_EXPANDED = 30; // 展開模式每列高度 (px) - 單行
     const ROW_HEIGHT_COLLAPSED = 44; // 收起模式每列高度 (px) - 雙行
@@ -1013,6 +1092,14 @@ const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxV
         setStockExpanded(prev => !prev);
     }, []);
 
+    // 回報可視範圍股票，供 52 週預載 Hook 使用（必須在 early return 之前）
+    const visibleStocks = stocks?.length > 0 ? stocks.slice(startIndex, endIndex) : [];
+    useEffect(() => {
+        if (onVisibleStocksChange && visibleStocks.length > 0) {
+            onVisibleStocksChange(visibleStocks);
+        }
+    }, [startIndex, endIndex, stocks, onVisibleStocksChange]);
+
     // 空資料處理
     if (!stocks || stocks.length === 0) {
         return (
@@ -1024,9 +1111,6 @@ const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxV
 
     const isHK = market === 'HK';
     const totalHeight = stocks.length * rowHeight;
-
-    // 取得可視範圍內的股票資料
-    const visibleStocks = stocks.slice(startIndex, endIndex);
 
     return (
         <div
@@ -1130,9 +1214,22 @@ const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxV
                                             }`}
                                         style={{ height: rowHeight }}
                                     >
-                                        {/* Sticky: 排名 */}
-                                        <td className={`sticky left-0 z-10 px-1 py-1 text-center text-xs text-gray-500 dark:text-gray-400 font-mono shadow-[1px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)] hover:bg-gray-50 dark:hover:bg-gray-850 ${isHighlighted ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-white dark:bg-gray-950'}`} style={{ width: '40px' }}>
-                                            {realIndex + 1}
+                                        {/* Sticky: 排名（含 52 週區間圓環）*/}
+                                        <td className={`sticky left-0 z-10 px-0 py-0 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)] hover:bg-gray-50 dark:hover:bg-gray-850 ${isHighlighted ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-white dark:bg-gray-950'}`} style={{ width: '40px' }}>
+                                            <div className="flex items-center justify-center w-full h-full">
+                                                {(() => {
+                                                    const cached = weekRange52Cache?.get(stock.counter_id);
+                                                    if (cached) {
+                                                        const { yearHigh, yearLow } = cached;
+                                                        const price = parseFloat(stock.indicators[IND_IDX.PRICE]);
+                                                        const percent = (yearHigh !== yearLow)
+                                                            ? Math.round((price - yearLow) / (yearHigh - yearLow) * 100)
+                                                            : 0;
+                                                        return <WeekRangeRing rank={realIndex + 1} percent={percent} size={stockExpanded ? 22 : 30} />;
+                                                    }
+                                                    return <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{realIndex + 1}</span>;
+                                                })()}
+                                            </div>
                                         </td>
                                         {/* Sticky: 股票資訊 */}
                                         <td className={`sticky z-10 px-2 py-1 shadow-[2px_0_0_0_rgba(0,0,0,0.05)] dark:shadow-[2px_0_0_0_rgba(255,255,255,0.05)] relative overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-850 ${isHighlighted ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-white dark:bg-gray-950'}`} style={{ left: '40px' }}>
@@ -1866,24 +1963,7 @@ const WeekRange52Card = ({ yearHigh, yearLow, currentPrice }) => {
         ? arcPath(startAngle, progressAngle)
         : '';
 
-    // 恐貪指數漸層色：0% 紅 → 50% 黃 → 100% 綠
-    const getGaugeColor = (pct) => {
-        if (pct <= 50) {
-            // 紅 (0,80,60) → 黃 (45,90,55)
-            const t = pct / 50;
-            const h = Math.round(0 + t * 45);
-            const s = Math.round(80 + t * 10);
-            const l = Math.round(50 + t * 8);
-            return `hsl(${h}, ${s}%, ${l}%)`;
-        } else {
-            // 黃 (45,90,55) → 綠 (140,70,42)
-            const t = (pct - 50) / 50;
-            const h = Math.round(45 + t * 95);
-            const s = Math.round(90 - t * 20);
-            const l = Math.round(58 - t * 16);
-            return `hsl(${h}, ${s}%, ${l}%)`;
-        }
-    };
+    // 恐貪指數漸層色：複用全域 getGaugeColor
 
     const gaugeColor = getGaugeColor(clampedPercent);
 
@@ -3028,7 +3108,6 @@ const MarketBreadthModal = ({ isOpen, onClose, data }) => {
         </div>
     );
 };
-
 const App = () => {
 
     // ========================================
@@ -3083,6 +3162,67 @@ const App = () => {
     const [selectedStock, setSelectedStock] = useState(null);
     const handleStockClick = (stock) => setSelectedStock(stock);
     const handleCloseStockModal = () => setSelectedStock(null);
+
+    // 52 週區間預載狀態
+    const [visibleStocksForPrefetch, setVisibleStocksForPrefetch] = useState([]);
+    const weekRange52CacheRef = useRef(new Map());   // counter_id → { yearHigh, yearLow }
+    const weekRange52PendingRef = useRef(new Set());  // 正在抓取的 ID
+    const [weekRange52Version, setWeekRange52Version] = useState(0); // 觸發重渲染用
+
+    // 52 週區間可視區域批次預載
+    useEffect(() => {
+        if (!visibleStocksForPrefetch?.length) return;
+
+        const controller = new AbortController();
+        const cache = weekRange52CacheRef.current;
+        const pending = weekRange52PendingRef.current;
+
+        // 篩選出需要抓取的股票（未快取且未在抓取中）
+        const queue = visibleStocksForPrefetch.filter(s =>
+            s.counter_id && !cache.has(s.counter_id) && !pending.has(s.counter_id)
+        );
+        if (queue.length === 0) return;
+
+        const BATCH_SIZE = 3;
+        const BATCH_DELAY = 200;
+        let batchIdx = 0;
+
+        const processBatch = async () => {
+            if (controller.signal.aborted) return;
+            const batch = queue.slice(batchIdx, batchIdx + BATCH_SIZE);
+            if (batch.length === 0) return;
+            batchIdx += BATCH_SIZE;
+
+            await Promise.allSettled(
+                batch.map(async (stock) => {
+                    const id = stock.counter_id;
+                    pending.add(id);
+                    try {
+                        const url = CHART_PROXY + encodeURIComponent(DETAIL_API(id));
+                        const res = await fetch(url, { signal: controller.signal });
+                        const json = await res.json();
+                        const yh = parseFloat(json.data?.year_high);
+                        const yl = parseFloat(json.data?.year_low);
+                        if (!isNaN(yh) && !isNaN(yl)) {
+                            cache.set(id, { yearHigh: yh, yearLow: yl });
+                        }
+                    } catch { /* 忽略 abort 或網路錯誤 */ }
+                    finally { pending.delete(id); }
+                })
+            );
+            // 觸發重渲染以顯示新圓環
+            setWeekRange52Version(v => v + 1);
+            // 繼續下一批
+            if (!controller.signal.aborted && batchIdx < queue.length) {
+                setTimeout(processBatch, BATCH_DELAY);
+            }
+        };
+
+        // 延遲 500ms 開始（等捲動穩定後再抓）
+        const timer = setTimeout(processBatch, 500);
+        return () => { controller.abort(); clearTimeout(timer); };
+    }, [visibleStocksForPrefetch]);
+
 
     // 設定相關狀態
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -3915,6 +4055,8 @@ const App = () => {
                                 highlightedStockCode={highlightedStock}
                                 fontSizePercent={fontSizePercent}
                                 headerHeight={headerHeight}
+                                weekRange52Cache={weekRange52CacheRef.current}
+                                onVisibleStocksChange={setVisibleStocksForPrefetch}
                             />
                         </div>
                         {/* 下方：Split View - 板塊成分股 */}
