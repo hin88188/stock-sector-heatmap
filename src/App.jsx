@@ -1834,6 +1834,155 @@ const StockInfoGrid = ({ data, loading, className }) => {
 };
 
 // ========================================
+// WeekRange52Card - 52 週區間儀表板卡片
+// ========================================
+const WeekRange52Card = ({ yearHigh, yearLow, currentPrice }) => {
+    // 計算百分比（四捨五入整數）
+    const percent = (yearHigh != null && yearLow != null && currentPrice != null && yearHigh !== yearLow)
+        ? Math.round((currentPrice - yearLow) / (yearHigh - yearLow) * 100)
+        : null;
+
+    // 將百分比 clamp 到 0~100
+    const clampedPercent = percent != null ? Math.max(0, Math.min(100, percent)) : 0;
+
+    // SVG 半圓儀表板參數
+    const cx = 70, cy = 62, r = 50;
+    const startAngle = Math.PI;     // 180° (左)
+    const endAngle = 0;             // 0° (右)
+    const sweepAngle = Math.PI;     // 半圓
+
+    // 底弧路徑（完整半圓）
+    const arcPath = (startA, endA) => {
+        const x1 = cx + r * Math.cos(startA);
+        const y1 = cy - r * Math.sin(startA);
+        const x2 = cx + r * Math.cos(endA);
+        const y2 = cy - r * Math.sin(endA);
+        return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`;
+    };
+
+    // 進度弧路徑
+    const progressAngle = startAngle - (clampedPercent / 100) * sweepAngle;
+    const progressPath = (clampedPercent > 0)
+        ? arcPath(startAngle, progressAngle)
+        : '';
+
+    // 恐貪指數漸層色：0% 紅 → 50% 黃 → 100% 綠
+    const getGaugeColor = (pct) => {
+        if (pct <= 50) {
+            // 紅 (0,80,60) → 黃 (45,90,55)
+            const t = pct / 50;
+            const h = Math.round(0 + t * 45);
+            const s = Math.round(80 + t * 10);
+            const l = Math.round(50 + t * 8);
+            return `hsl(${h}, ${s}%, ${l}%)`;
+        } else {
+            // 黃 (45,90,55) → 綠 (140,70,42)
+            const t = (pct - 50) / 50;
+            const h = Math.round(45 + t * 95);
+            const s = Math.round(90 - t * 20);
+            const l = Math.round(58 - t * 16);
+            return `hsl(${h}, ${s}%, ${l}%)`;
+        }
+    };
+
+    const gaugeColor = getGaugeColor(clampedPercent);
+
+    // 百分比文字顏色
+    const textColor = gaugeColor;
+
+    return (
+        <div className="flex-shrink-0 w-[160px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 p-3 flex flex-col items-center">
+            {/* 標題 */}
+            <div className="text-sm font-bold text-gray-800 dark:text-gray-200 text-center mb-1">
+                52 週區間
+            </div>
+
+            {/* SVG 儀表板 */}
+            <svg viewBox="0 0 140 75" className="w-full max-w-[130px]">
+                <defs>
+                    <linearGradient id="gaugeGradient52w" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="hsl(0, 80%, 50%)" />
+                        <stop offset="50%" stopColor="hsl(45, 90%, 58%)" />
+                        <stop offset="100%" stopColor="hsl(140, 70%, 42%)" />
+                    </linearGradient>
+                </defs>
+
+                {/* 底弧（灰色軌道）*/}
+                <path
+                    d={arcPath(startAngle, endAngle)}
+                    fill="none"
+                    stroke="currentColor"
+                    className="text-gray-200 dark:text-gray-700"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                />
+
+                {/* 進度弧 */}
+                {clampedPercent > 0 && (
+                    <path
+                        d={progressPath}
+                        fill="none"
+                        stroke={gaugeColor}
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                    />
+                )}
+
+                {/* 中央百分比 */}
+                <text
+                    x={cx}
+                    y={cy - 5}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="text-xl font-bold"
+                    style={{ fill: textColor, fontSize: '22px', fontWeight: 700 }}
+                >
+                    {percent != null ? `${clampedPercent}%` : '-'}
+                </text>
+            </svg>
+
+            {/* 底部標籤：52周低 / 52周高 */}
+            <div className="flex justify-between w-full mt-0.5 px-1">
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
+                    {yearLow != null ? formatNumber(yearLow) : '-'}
+                </span>
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
+                    {yearHigh != null ? formatNumber(yearHigh) : '-'}
+                </span>
+            </div>
+        </div>
+    );
+};
+
+
+// ========================================
+// KeyMetricsPanel - 主要指標卡片水平滑動容器
+// ========================================
+const KeyMetricsPanel = ({ detailData, loading, currentPrice }) => {
+    if (loading) {
+        return (
+            <div className="flex gap-3 p-4 overflow-x-auto no-scrollbar">
+                {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex-shrink-0 w-[160px] h-[130px] rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex gap-3 p-4 overflow-x-auto no-scrollbar">
+            <WeekRange52Card
+                yearHigh={detailData?.year_high}
+                yearLow={detailData?.year_low}
+                currentPrice={currentPrice ?? detailData?.last_done}
+            />
+            {/* 未來可在此新增更多卡片 */}
+        </div>
+    );
+};
+
+
+// ========================================
 // StockDetailModal - 股票詳情模態框
 // ========================================
 const CHART_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
@@ -1870,6 +2019,7 @@ const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, proces
     const [showSectorStocks, setShowSectorStocks] = useState(false); // 行業成分股展開狀態
     const [activeTab, setActiveTab] = useState('chart'); // 當前選中的 Tab
     const chartRef = useRef(null); // 圖表區塊 ref
+    const keyRef = useRef(null); // 主要區塊 ref
     const infoRef = useRef(null); // 資訊區塊 ref
     const contentRef = useRef(null); // 滾動容器 ref
 
@@ -2013,6 +2163,8 @@ const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, proces
                     if (entry.isIntersecting && entry.intersectionRatio >= 0.3) {
                         if (entry.target.id === 'section-chart') {
                             setActiveTab('chart');
+                        } else if (entry.target.id === 'section-key') {
+                            setActiveTab('key');
                         } else if (entry.target.id === 'section-info') {
                             setActiveTab('info');
                         }
@@ -2026,6 +2178,7 @@ const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, proces
         );
 
         if (chartRef.current) observer.observe(chartRef.current);
+        if (keyRef.current) observer.observe(keyRef.current);
         if (infoRef.current) observer.observe(infoRef.current);
 
         return () => observer.disconnect();
@@ -2034,6 +2187,7 @@ const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, proces
     // Tab 定義
     const tabs = [
         { id: 'chart', label: '圖表', ref: chartRef },
+        { id: 'key', label: '主要', ref: keyRef },
         { id: 'info', label: '資訊', ref: infoRef }
     ];
 
@@ -2118,6 +2272,12 @@ const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, proces
 
                     {/* Left Column: Info Grid - Landscape Only */}
                     <div className="hidden landscape:block w-[35%] h-full overflow-y-auto border-r border-gray-200 dark:border-gray-700 scroll-container">
+                        {/* 主要指標卡片 - Landscape */}
+                        <KeyMetricsPanel
+                            detailData={detailData}
+                            loading={detailLoading}
+                            currentPrice={stock.indicators[0]}
+                        />
                         <StockInfoGrid
                             data={detailData}
                             loading={detailLoading}
@@ -2145,6 +2305,15 @@ const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, proces
                                 onRangeChange={setSelectedRange}
                                 rangeData={rangeData}
                                 className="flex flex-col gap-2 p-2 h-full overflow-y-auto no-scrollbar overscroll-y-contain"
+                            />
+                        </div>
+
+                        {/* 主要區塊 - Portrait Only */}
+                        <div ref={keyRef} id="section-key" className="mt-4 landscape:hidden">
+                            <KeyMetricsPanel
+                                detailData={detailData}
+                                loading={detailLoading}
+                                currentPrice={stock.indicators[0]}
                             />
                         </div>
 
