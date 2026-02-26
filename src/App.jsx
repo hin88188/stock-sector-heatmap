@@ -1227,7 +1227,8 @@ const TurnoverList = ({ stocks, market, sectorAvgChanges, sectorData, globalMaxV
                                                             : 0;
                                                         return <WeekRangeRing rank={realIndex + 1} percent={percent} size={stockExpanded ? 22 : 30} />;
                                                     }
-                                                    return <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{realIndex + 1}</span>;
+                                                    // 未快取：脈衝動畫提示載入中
+                                                    return <span className="text-xs text-gray-400 dark:text-gray-500 font-mono animate-pulse">{realIndex + 1}</span>;
                                                 })()}
                                             </div>
                                         </td>
@@ -3165,8 +3166,22 @@ const App = () => {
 
     // 52 週區間預載狀態
     const [visibleStocksForPrefetch, setVisibleStocksForPrefetch] = useState([]);
-    const weekRange52CacheRef = useRef(new Map());   // counter_id → { yearHigh, yearLow }
+    const weekRange52CacheRef = useRef(null);
+    if (weekRange52CacheRef.current === null) {
+        // 首次渲染：從 localStorage 復原 52 週快取（TTL 24 小時，高低點不常變動）
+        try {
+            const raw = localStorage.getItem('weekRange52Cache');
+            if (raw) {
+                const { ts, data } = JSON.parse(raw);
+                if (Date.now() - ts < 24 * 60 * 60 * 1000) {
+                    weekRange52CacheRef.current = new Map(Object.entries(data));
+                }
+            }
+        } catch { /* 忽略損壞的快取 */ }
+        if (!weekRange52CacheRef.current) weekRange52CacheRef.current = new Map();
+    }
     const weekRange52PendingRef = useRef(new Set());  // 正在抓取的 ID
+    const weekRange52FailedRef = useRef(new Map());   // 失敗的 ID → 重試次數
     const [weekRange52Version, setWeekRange52Version] = useState(0); // 觸發重渲染用
 
     // 52 週區間可視區域批次預載
@@ -3176,15 +3191,20 @@ const App = () => {
         const controller = new AbortController();
         const cache = weekRange52CacheRef.current;
         const pending = weekRange52PendingRef.current;
+        const failed = weekRange52FailedRef.current;
+        const MAX_RETRIES = 1;
 
         // 篩選出需要抓取的股票（未快取且未在抓取中）
-        const queue = visibleStocksForPrefetch.filter(s =>
-            s.counter_id && !cache.has(s.counter_id) && !pending.has(s.counter_id)
-        );
+        // 也納入失敗但重試次數未達上限的 ID
+        const queue = visibleStocksForPrefetch.filter(s => {
+            if (!s.counter_id || cache.has(s.counter_id) || pending.has(s.counter_id)) return false;
+            const retries = failed.get(s.counter_id) || 0;
+            return retries <= MAX_RETRIES;
+        });
         if (queue.length === 0) return;
 
-        const BATCH_SIZE = 3;
-        const BATCH_DELAY = 200;
+        const BATCH_SIZE = 10;
+        const BATCH_DELAY = 50;
         let batchIdx = 0;
 
         const processBatch = async () => {
@@ -3206,20 +3226,30 @@ const App = () => {
                         if (!isNaN(yh) && !isNaN(yl)) {
                             cache.set(id, { yearHigh: yh, yearLow: yl });
                         }
-                    } catch { /* 忽略 abort 或網路錯誤 */ }
+                    } catch (e) {
+                        // abort 不記錄為失敗
+                        if (e?.name !== 'AbortError') {
+                            failed.set(id, (failed.get(id) || 0) + 1);
+                        }
+                    }
                     finally { pending.delete(id); }
                 })
             );
             // 觸發重渲染以顯示新圓環
             setWeekRange52Version(v => v + 1);
+            // 持久化到 localStorage
+            try {
+                const obj = Object.fromEntries(cache);
+                localStorage.setItem('weekRange52Cache', JSON.stringify({ ts: Date.now(), data: obj }));
+            } catch { /* localStorage 可能已滿，忽略 */ }
             // 繼續下一批
             if (!controller.signal.aborted && batchIdx < queue.length) {
                 setTimeout(processBatch, BATCH_DELAY);
             }
         };
 
-        // 延遲 500ms 開始（等捲動穩定後再抓）
-        const timer = setTimeout(processBatch, 500);
+        // 延遲 300ms 開始（等捲動穩定後再抓）
+        const timer = setTimeout(processBatch, 300);
         return () => { controller.abort(); clearTimeout(timer); };
     }, [visibleStocksForPrefetch]);
 
@@ -3262,6 +3292,8 @@ const App = () => {
         // 清除所有資料緩存（stockdata_ 前綴），下次重整強制重新抓取
         const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith('stockdata_'));
         keysToRemove.forEach(k => localStorage.removeItem(k));
+        // 清除 52 週區間快取
+        localStorage.removeItem('weekRange52Cache');
     };
 
     // 讀取暗黑模式設定
