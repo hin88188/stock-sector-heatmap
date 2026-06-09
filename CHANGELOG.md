@@ -2,6 +2,26 @@
 
 本文件記錄所有版本的更新內容。格式基於 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.0.0/)。
 
+## [v1.6.9] - 2026-06-10
+
+### 變更
+- 🏗️ **移除第三方 CORS Proxy 依賴，改用反向代理架構**：
+  - 正式環境：透過 nginx-proxy-manager (NPM) Custom Locations 將 `/api/lbkrs`、`/api/feargreed` 反向代理至對應 API 伺服器。
+  - 開發環境：透過 Vite `server.proxy` 內建代理功能，無需任何 CORS proxy。
+  - 前端程式碼統一使用相對路徑 (`/api/lbkrs/...`)，不再依賴 `api.codetabs.com`，提升穩定性與回應速度。
+  - `MARKETS` 常數從 `.url` (完整 URL) 改為 `.path` (相對路徑)。
+  - 移除 `isDev` 環境判斷、`CORS_PROXY` 常數與 `encodeURIComponent` 編碼邏輯。
+  - `CHART_APIS` 與 `DETAIL_API` 改為回傳相對路徑。
+  - 新增 `API` 路由物件，統一管理 `/api/lbkrs` 與 `/api/feargreed` 路徑。
+
+### 修復
+- 🐛 **修復語言切換（繁/簡/Eng）功能失效**：
+  - 根因：lbkrs.com API 以瀏覽器 `Accept-Language` header 覆蓋 `locale` query parameter，導致不管切換什麼語言都回傳繁體中文。
+  - 修正：在 nginx proxy 與 Vite proxy 中清除 `Accept-Language` header，確保 API 僅依據 `locale` 參數回傳對應語言資料。
+
+### 新增
+- 📁 新增 `nginx/custom-locations.conf`：NPM Custom Locations 設定參考檔案，供部署時手動套用。
+
 ## [v1.6.8] - 2026-02-26
 
 ### 優化

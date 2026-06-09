@@ -56,10 +56,10 @@ Stock Sector Heatmap is a React-based single-page application (SPA) that visuali
 # Install dependencies
 npm install
 
-# Start development server
+# Start development server (Vite proxy handles API forwarding)
 npm run dev
 
-# Build for production
+# Build for production (single HTML file)
 npm run build
 
 # Preview production build locally
@@ -69,3 +69,6 @@ npm run preview
 ## NOTES
 - The application relies heavily on a single large file (`App.jsx`) which contains > 200,000 bytes. This might be a target for future refactoring into smaller, more manageable components.
 - The `agentation` tool is conditionally loaded in development mode only.
+- **API Proxy Architecture (v1.6.9+)**: Dev uses Vite `server.proxy`, prod uses nginx reverse proxy (NPM Custom Locations). Frontend uses relative paths (`/api/lbkrs/...`, `/api/feargreed/...`) — no CORS proxy needed.
+- **Important**: The nginx/Vite proxy MUST clear `Accept-Language` header for `/api/lbkrs/`, otherwise lbkrs.com API overrides the `locale` query parameter.
+- See `nginx/custom-locations.conf` for NPM configuration reference.

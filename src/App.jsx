@@ -8,13 +8,13 @@ const MARKETS = {
         id: 'US',
         label: '美股',
         limit: 2000,
-        url: 'https://m-gl.lbkrs.com/api/forward/newmarket/revision/rank/pc/list?key=all&market=US&indicators[]=last_done&indicators[]=chg&indicators[]=change&indicators[]=total_amount&indicators[]=total_balance&indicators[]=five_min_chg&indicators[]=turnover_rate&indicators[]=amplitude&indicators[]=volume_rate&indicators[]=depth_rate&indicators[]=pb_ttm&indicators[]=market_cap&indicators[]=five_day_chg&indicators[]=ten_day_chg&indicators[]=twenty_day_chg&indicators[]=this_year_chg&indicators[]=half_year_chg&indicators[]=industry&sort_indicator=total_balance&order=desc&offset=0&limit=2000'
+        path: '/api/forward/newmarket/revision/rank/pc/list?key=all&market=US&indicators[]=last_done&indicators[]=chg&indicators[]=change&indicators[]=total_amount&indicators[]=total_balance&indicators[]=five_min_chg&indicators[]=turnover_rate&indicators[]=amplitude&indicators[]=volume_rate&indicators[]=depth_rate&indicators[]=pb_ttm&indicators[]=market_cap&indicators[]=five_day_chg&indicators[]=ten_day_chg&indicators[]=twenty_day_chg&indicators[]=this_year_chg&indicators[]=half_year_chg&indicators[]=industry&sort_indicator=total_balance&order=desc&offset=0&limit=2000'
     },
     HK: {
         id: 'HK',
         label: '港股',
         limit: 300,
-        url: 'https://m-gl.lbkrs.com/api/forward/newmarket/revision/rank/pc/list?key=all&market=HK&indicators[]=last_done&indicators[]=chg&indicators[]=change&indicators[]=total_amount&indicators[]=total_balance&indicators[]=five_min_chg&indicators[]=turnover_rate&indicators[]=amplitude&indicators[]=volume_rate&indicators[]=depth_rate&indicators[]=pb_ttm&indicators[]=market_cap&indicators[]=five_day_chg&indicators[]=ten_day_chg&indicators[]=twenty_day_chg&indicators[]=this_year_chg&indicators[]=half_year_chg&indicators[]=industry&sort_indicator=total_balance&order=desc&offset=0&limit=300'
+        path: '/api/forward/newmarket/revision/rank/pc/list?key=all&market=HK&indicators[]=last_done&indicators[]=chg&indicators[]=change&indicators[]=total_amount&indicators[]=total_balance&indicators[]=five_min_chg&indicators[]=turnover_rate&indicators[]=amplitude&indicators[]=volume_rate&indicators[]=depth_rate&indicators[]=pb_ttm&indicators[]=market_cap&indicators[]=five_day_chg&indicators[]=ten_day_chg&indicators[]=twenty_day_chg&indicators[]=this_year_chg&indicators[]=half_year_chg&indicators[]=industry&sort_indicator=total_balance&order=desc&offset=0&limit=300'
     }
 };
 
@@ -54,6 +54,12 @@ const IND_IDX = {
     CHG_YTD: 15,
     CHG_6M: 16,
     INDUSTRY: 17
+};
+
+// --- API 路徑設定：開發環境由 Vite proxy 處理，正式環境由 nginx 處理 ---
+const API = {
+    lbkrs: (path) => `/api/lbkrs${path}`,
+    feargreed: (path) => `/api/feargreed${path}`,
 };
 
 // --- Utilities ---
@@ -2066,14 +2072,13 @@ const KeyMetricsPanel = ({ detailData, loading, currentPrice }) => {
 // ========================================
 // StockDetailModal - 股票詳情模態框
 // ========================================
-const CHART_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
 const CHART_APIS = {
     // 1D: 分時數據（timeshares v5，獨立結構）
-    '1D': (id) => `https://m-gl.lbkrs.com/api/forward/v5/quote/stock/timeshares?counter_id=${id}&trade_session=0`,
+    '1D': (id) => `/api/forward/v5/quote/stock/timeshares?counter_id=${id}&trade_session=0`,
     // 5D: 多日分時（mutitimeshares，獨立結構）
-    '5D': (id) => `https://m-gl.lbkrs.com/api/forward/quote/stock/mutitimeshares?counter_id=${id}&merge_minute=0`,
+    '5D': (id) => `/api/forward/quote/stock/mutitimeshares?counter_id=${id}&merge_minute=0`,
     // K線：統一取 260 筆（1Y），前端切片產生 1M/3M/6M/1Y
-    'KLINE': (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/kline?counter_id=${id}&line_num=260&line_type=1000`,
+    'KLINE': (id) => `/api/forward/v3/quote/kline?counter_id=${id}&line_num=260&line_type=1000`,
 };
 
 // K 線切片映射：從完整 260 筆數據的尾端取對應數量
@@ -2087,7 +2092,7 @@ const calcChange = (points, baseline) => {
     return 0;
 };
 
-const DETAIL_API = (id) => `https://m-gl.lbkrs.com/api/forward/v3/quote/stock/detail?counter_id=${id}`;
+const DETAIL_API = (id) => `/api/forward/v3/quote/stock/detail?counter_id=${id}`;
 
 const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, processedSectors, globalMaxVal, timeRangeIdx, language }) => {
     const [selectedRange, setSelectedRange] = useState('1D');
@@ -2131,8 +2136,8 @@ const StockDetailModal = ({ stock, onClose, sectorData, sectorAvgChanges, proces
         const controller = new AbortController();
 
         // 共用的 proxy fetch 工具函數
-        const fetchWithProxy = async (apiUrl) => {
-            const url = CHART_PROXY + encodeURIComponent(apiUrl);
+        const fetchWithProxy = async (apiPath) => {
+            const url = API.lbkrs(apiPath);
             const res = await fetch(url, { signal: controller.signal });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
@@ -2441,9 +2446,7 @@ const getFGStatus = (val) => {
 };
 
 const fetchFearGreedData = async () => {
-    const TARGET = "https://feargreedmeter.com/_next/data/UTI167DfsxwvK8Klmh1X2/fear-and-greed-index.json";
-    const PROXY = "https://api.codetabs.com/v1/proxy?quest=";
-    const url = PROXY + encodeURIComponent(TARGET);
+    const url = API.feargreed("/_next/data/UTI167DfsxwvK8Klmh1X2/fear-and-greed-index.json");
 
     try {
         const res = await fetch(url, { cache: 'no-store' });
@@ -3218,7 +3221,7 @@ const App = () => {
                     const id = stock.counter_id;
                     pending.add(id);
                     try {
-                        const url = CHART_PROXY + encodeURIComponent(DETAIL_API(id));
+                        const url = API.lbkrs(DETAIL_API(id));
                         const res = await fetch(url, { signal: controller.signal });
                         const json = await res.json();
                         const yh = parseFloat(json.data?.year_high);
@@ -3514,11 +3517,9 @@ const App = () => {
             if (fgCached) setFearGreedData(fgCached);
         }
 
-        const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
-
         try {
-            const targetUrl = MARKETS[market].url + '&_t=' + Date.now() + '&locale=' + language;
-            const proxyUrl = PROXY + encodeURIComponent(targetUrl);
+            const path = MARKETS[market].path + '&_t=' + Date.now() + '&locale=' + language;
+            const proxyUrl = API.lbkrs(path);
 
             // 方案 B：並行呼叫主資料 API 與 Fear & Greed API（F&G 有緩存則跳過網路）
             const [res] = await Promise.all([
@@ -3592,11 +3593,9 @@ const App = () => {
             return;
         }
 
-        const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
-
         try {
-            const targetUrl = MARKETS[otherMarket].url + '&_t=' + Date.now() + '&locale=' + language;
-            const proxyUrl = PROXY + encodeURIComponent(targetUrl);
+            const path = MARKETS[otherMarket].path + '&_t=' + Date.now() + '&locale=' + language;
+            const proxyUrl = API.lbkrs(path);
 
             const res = await fetch(proxyUrl, { cache: 'no-store' });
             if (!res.ok) return;

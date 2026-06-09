@@ -11,4 +11,19 @@ export default defineConfig({
     tailwindcss(),
     viteSingleFile(),  // 將 CSS/JS 全部 inline 到單一 HTML 檔案
   ],
+  server: {
+    proxy: {
+      '/api/lbkrs': {
+        target: 'https://m-gl.lbkrs.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/lbkrs/, ''),
+        headers: { 'Accept-Language': '' },
+      },
+      '/api/feargreed': {
+        target: 'https://feargreedmeter.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/feargreed/, ''),
+      },
+    },
+  },
 })
